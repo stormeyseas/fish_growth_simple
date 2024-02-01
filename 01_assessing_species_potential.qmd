@@ -1,0 +1,100 @@
+---
+title: "Assessing species potential"
+format: html
+editor: visual
+---
+
+Set up
+```{r}
+
+#libraries
+
+library(tidyverse)
+library(here)
+library(janitor)
+library(countrycode)
+
+
+source("src/dir.R")
+
+
+
+
+
+```
+
+
+Pull in FAO data for aquaculture production
+```{r}
+
+
+aquaculture_raw <- read_csv(file.path(rdsi_dir, "raw_data/fao/FAO_fishstat_2020/global_aquaculture_production_1950_2020.csv"))
+
+  
+  
+
+
+
+
+ (aquaculture_prod <- 
+  aquaculture_raw |> 
+  clean_names() |> 
+  select(c(1:7, starts_with("x"))) |> 
+  pivot_longer(names_to = "year", values_to = "production", cols= -c(1:7)) |> 
+  mutate(year = gsub(pattern="x", replacement = "", year)) |> 
+  filter(year %in% c(2015:2020)) |> 
+  group_by(asfis_species_name_2, asfis_species_name_3, environment_name, year) |> 
+  summarise(production = sum(production)) |> 
+    ungroup() |> 
+     filter(environment_name=="Marine" & 
+           !asfis_species_name_3 %in% c("Clams, cockles, arkshells", 
+                                        "Abalones, winkles, conchs",
+                                        "Mussels", 
+                                        "Oysters",
+                                        "Shrimps, prawns",
+                                        "Crabs, sea-spiders",
+                                         "Freshwater molluscs",
+                                        "Squids, cuttlefishes, octopuses",
+                                        "Pearls, mother-of-pearl, shells",
+                                        "Miscellaneous aquatic plants",
+                                        "Scallops, pectens"),
+         !grepl("seaweeds" , asfis_species_name_3)) |> 
+     group_by(asfis_species_name_2) |> 
+     summarise(production = mean(production)) |> 
+  arrange(-production)
+)
+
+
+
+(aquaculture_country_prod <- 
+  aquaculture_raw |> 
+  clean_names() |> 
+  select(c(1:7, starts_with("x"))) |> 
+  pivot_longer(names_to = "year", values_to = "production", cols= -c(1:7)) |> 
+  mutate(year = gsub(pattern="x", replacement = "", year)) |> 
+  filter(year %in% c(2015:2020)) |> 
+  group_by(asfis_species_name_2, asfis_species_name_3, environment_name, year) |> 
+  summarise(production = sum(production)) |> 
+    ungroup() |> 
+     filter(environment_name=="Marine" & 
+           !asfis_species_name_3 %in% c("Clams, cockles, arkshells", 
+                                        "Abalones, winkles, conchs",
+                                        "Mussels", 
+                                        "Oysters",
+                                        "Shrimps, prawns",
+                                        "Crabs, sea-spiders",
+                                         "Freshwater molluscs",
+                                        "Squids, cuttlefishes, octopuses",
+                                        "Pearls, mother-of-pearl, shells",
+                                        "Miscellaneous aquatic plants",
+                                        "Scallops, pectens"),
+         !grepl("seaweeds" , asfis_species_name_3)) |> 
+     group_by(asfis_species_name_2) |> 
+     summarise(production = mean(production)) |> 
+  arrange(-production)
+)
+
+
+
+```
+
