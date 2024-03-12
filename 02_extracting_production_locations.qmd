@@ -1,0 +1,18 @@
+---
+title: "Extracting production locations for each species to obtain environmental forcings"
+format: html
+editor: visual
+---
+
+## Set up
+
+```{r}
+
+
+library(tidyverse)
+library(here)
+
+
+
+
+```

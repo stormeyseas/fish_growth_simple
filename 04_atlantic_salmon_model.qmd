@@ -1,0 +1,31 @@
+---
+title: "Atlantic salmon model"
+format: html
+editor: visual
+---
+
+Setup
+
+```{r}
+library(tidyverse)
+library(here)
+library(RAC)
+
+```
+
+
+
+```{r}
+
+
+
+```
+
+Growth variable
+
+```{r}
+
+
+
+```
+

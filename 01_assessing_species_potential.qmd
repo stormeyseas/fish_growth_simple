@@ -5,6 +5,7 @@ editor: visual
 ---
 
 Set up
+
 ```{r}
 
 #libraries
@@ -19,12 +20,10 @@ source("src/dir.R")
 
 
 
-
-
 ```
 
-
 Pull in FAO data for aquaculture production
+
 ```{r}
 
 
@@ -143,3 +142,17 @@ ggsave("explore/cottrell_explore/global_proportion_finfish_by_country.jpg", dpi 
 
 ```
 
+Species decided on:
+
+| Common name          | Scientific name                                                                             |
+|:----------------|:------------------------------------------------------|
+| Atlantic salmon      | Salmo salar                                                                                 |
+| Other salmonids      | Generalised multi-species model - incl. Oncorhynchus mykiss and Oncorhynchus kisutch (Coho) |
+| European seabass     | Dicentrarchus labrax                                                                        |
+| Gilthead seabream    | Sparus aurata                                                                               |
+| Large Yellow Croaker | Larimichthys crocea                                                                         |
+| Japanese seabass     | Lateolabrax japonicus                                                                       |
+| Japanese amberjack   | Seriola quinqueradiata                                                                      |
+| Groupers             | Generalised mutli-species model                                                             |
+| Pompano              | Trachinotus blochii                                                                         |
+| Milkfish             | Chanos chanos                                                                               |
