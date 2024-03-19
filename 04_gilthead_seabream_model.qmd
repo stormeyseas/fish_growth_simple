@@ -6,12 +6,12 @@ editor: visual
 
 Setup
 
-```{r}
+```{r, message=FALSE}
 library(tidyverse)
 library(here)
 
 
-species <- "european_seabass"
+species <- "gilthead_seabrean"
 
 ```
 
@@ -19,7 +19,14 @@ Data loader module
 
 ```{r}
 
+#create folders for parameters and forcings
+filepaths <- c(sprintf(here("data/forcings/%s_forcings"), species), sprintf(here("data/parameters/%s_parameters"), species) )
 
+for (path in filepaths){if(!file.exists(path)){dir.create(path)}}
+
+
+
+# pull in data for interpolation
 temp_data <-  read.csv(sprintf(here("data/forcings/%s_forcings/Water_temperature.csv"), species), sep = ",", header = FALSE)
 
 feed_rations <- read.csv(sprintf(here("data/forcings/%s_forcings/Feeding.csv"), species), sep = ",", header = FALSE)
@@ -128,8 +135,8 @@ message("The model will be executed with the following parameters:\n")
 
 #loop through parameters
 for (i in 1:21) {
-  cat(paste0(toString(Param_matrix[i, 2]), ": ", toString(Param_matrix[i, 
-                                                                       3]), " ", toString(Param_matrix[i, 4])), "\n")
+  cat(paste0(toString(param_matrix[i, 2]), ": ", toString(param_matrix[i, 
+                                                                       3]), " ", toString(param_matrix[i, 4])), "\n")
 }
 cat(" \n")
 cat("Weight initial condition is: ", toString(IC), " g\n")
@@ -184,66 +191,111 @@ output <- list(param_values, Tint, Gint, feed_contibutions, IC, times, dates,
 ```
 
 
-Equations
+Model equations
 ```{r}
 
 Param <- output[[1]]
-param_matrix
+Temp <- output[[2]]
+Feed_avail <- output[[3]]
+Feed <- output[[4]]
 
-ind_equations <- \(Param, Temp, Feed){
+ind_equations <- \(Param, Temp, Feed, Feed_avail){
   
-#Parameters
-ingmax = Param[1]  #maximum ingrestion rate (g/d)
-alpha = Param[2] # feeding catabolism coefficient
-betaprot = Param[3] # assimilation coefficient for protein
-betalip # assimilation coefficient for lipid
-betacarb # assimilation coefficient for carbohydrate
-epsprot # energy content 
-epslip
-epscarb 
-epsO2
-pk
-k0
-m
-
+  #Parameters
+  ingmax  <-  Param[1]  #maximum ingrestion rate (g/d)
+  alpha <-  Param[2] # feeding catabolism coefficient
+  betaprot  <-  Param[3] # assimilation coefficient for protein
+  betalip <-  Param[4]  # assimilation coefficient for lipid
+  betacarb <-  Param[5]# assimilation coefficient for carbohydrate
+  epsprot <-  Param[6]# energy content of protein (J/g protein)
+  epslip <-  Param[7]#energy content of lipid (J/g lipid)
+  epscarb <-  Param[8]# energy content of carbohydrates (J/g carbohydrate)
+  epsO2<-  Param[9] # energy consumed by respiration of 1 g of O2
+  pk <-  Param[10]# temperature coefficient for fasting catabolism
+  k0 <-  Param[11]# fasting catabolism at 0oC
+  m <-  Param[12]# weight exponent for the anabolism
+  n <-  Param[13]# weight exponent for the catabolism
+  betac <-  Param[14]# shape coefficient for H(Tw) function
+  Tma <-  Param[15]#maximum lethal temperature for Sparus aurata
+  Toa <-  Param[16]#optimal temperature for Sparus aurata
+  Taa <- Param[17] #Lowest feeding temperature for sparus aurata
+  omega <-  Param[18] #oxygen consumption weight loss ratio
+  a  <-  Param[19]#energy content of fish
+  k <- Param[20] #weight exponent for energy content
+  eff <-  Param[21]#food ingestion efficiency
   
   
-
+  # FORCINGS
+  
+  
+  #Feed composition
+  
+  Pcont=Feed[1]       # Percentage of proteins in the food
+  Lcont=Feed[2]       # Percentage of lipids in the food
+  Ccont=Feed[3]       #  Percentage of carbohydrates in the food
+  
+  #Temperature
+  Temp <- Temp # water temperature oC
+  
+  #Feeding 
+  Feed_avail <- Feed_avail # g of food per day
+  
+  
+  #H(Tw) function
+  
+  HTw = (((Tma-Temp)/(Tma-Toa))^betac*Tma) * exp(betac*(Temp-Toa))
+  
+  # K(Tw) function 
+  KTw = exp(pk*Temp)
+  
+  #weight 
+  w = output[[5]]
+  
+  
+  # EXPRESSIONS FOR NET ANABOLISM
+  
+  ing = ingmax*HTw*(w^m)
+  
+  #food limitation
+  if(ing >= Feed_avail){
+    ing = Feed_avail # 
+  } else {
+    ing = ing # otherwise use actual food ingrestion rate
+  }
+  
+  #temperature limitation
+  
+  if(Temp>Tma){
+    ing = 0
+  }
+  
+  A = (1-alpha)*ing*(Pcont*epsprot*betaprot + Ccont*epscarb*betacarb + Lcont*epslip*betalip) #Anabolism
+  Fcs = ing*(Pcont*(1-betaprot) + Ccont*(1-betacarb) + Lcont*(1-betalip))
+  
+  
+  
+  # EXPRESSIONS FOR NET CATABOLISM
+  
+  C = epsO2*k0*KTw*w^n
+  
+  
+  et = a*w^k
+  
+  
+  
+  #Growth equation
+  
+  dw_dt <- (A-C)/et
+  
   
 }
-
-```
-
-
 
 
 
 
 Salmon_ind_equations <- function(Param, Temp, Food){
   
-  # Parameters definition
-  ingmax=Param[1]        # [g/d] Maximum ingestion rate
-  alpha=Param[2]         # [-] Feeding catabolism coefficient
-  betaprot=Param[3]      # [-] Assimilation coefficient for protein
-  betalip=Param[4]       # [-] Assimilation coefficient for lipid
-  betacarb=Param[5]      # [-] Assimilation coefficient for carbohydrates
-  epsprot=Param[6]       # [J/gprot] Energy content of protein
-  epslip=Param[7]        # [J/glip] Energy content of lipid
-  epscarb=Param[8]       # [J/gcarb] Energy content of carbohydrate
-  epsO2=Param[9]         # [J/gO2] Energy consumed by the respiration of 1g of oxygen
-  pk=Param[10]           # [1/day] Temperature coefficient for the fasting catabolism
-  k0=Param[11]           # [1/Celsius degree]  Fasting catabolism at 0 Celsius degree
-  m=Param[12]            # [-] Weight exponent for the anabolism
-  n=Param[13]            # [-] Weight exponent for the catabolism
-  betac=Param[14]        # [-]  Shape coefficient for the H(Tw) function
-  Tma=Param[15]          # [Celsius degree] Maximum lethal temperature for Dicentrarchus labrax
-  Toa=Param[16]          # [Celsius degree] Optimal temperature for Dicentrarchus labrax
-  Taa=Param[17]          # [Celsius degree] Lowest feeding temperature for Dicentrarchus labrax
-  omega=Param[18]        # [gO2/g] Oxygen consumption - weight loss ratio
-  a=Param[19]            # [J/gtissue] Energy content of fish tissue
-  k=Param[20]            # [-] Weight exponent for energy content
-  eff=Param[21]          # [-] Food ingestion efficiency
-  
+
   # Food composition definition
   Pcont=Food[1]       # [-] Percentage of proteins in the food
   Lcont=Food[2]       # [-] Percentage of lipids in the food
@@ -354,6 +406,9 @@ Salmon_ind_equations <- function(Param, Temp, Food){
                     Cwst, ing, ingvero, anab, catab, O2, NH4, resource, fgT, frT, Temp)
   return(output) 
 }
+
+
+param_matrix
 ```
 
 

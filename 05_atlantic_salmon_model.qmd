@@ -1,0 +1,196 @@
+---
+title: "Atlantic salmon model"
+format: html
+editor: visual
+---
+
+Setup
+
+```{r}
+library(tidyverse)
+library(here)
+library(RAC)
+library(janitor)
+
+
+species <- "atlantic_salmon"
+
+```
+
+```{r}
+
+
+# 1. Salmon RAC model ----
+# taken from the RAC package: Bass_ind_equations
+
+## 1.1. Data vectors ----
+Param <- read.csv(sprintf(here("data/parameters/%s_parameters/Param.csv"), species)) |> pull(Value)
+
+Food <- read_csv(sprintf(here("data/forcings/%s_forcings/Feed.csv"), species)) |> pull(value)
+
+
+Temp <- read_csv(sprintf(here("data/forcings/%s_forcings/Temp_StormBay.csv"), species)) |> slice_head(n=367) |> pull(SST_celsius)
+
+Temp <- read_csv(sprintf(here("data/forcings/%s_forcings/IronPot_SST.csv"), species)) |> 
+  mutate(DATETIME_LOCAL = as.Date(DATETIME_LOCAL)) |> 
+  clean_names() |> 
+  select(temp = temp_c, date = datetime_local, lat = latitude, long = longitude) |> 
+  group_by(date) |> 
+  summarise(temp = max(temp)) |> 
+  slice_head(n = 366) |> 
+  pull(temp)
+
+
+# Temp: Copernicus data set - Storm Bay
+
+## 1.1. Function ----
+
+### WHERE I'M STUCK: I want to loop through the weight, and the resource (G)
+
+Salmon_ind_equations <- function(Param, Temp, Food){
+  
+  # Parameters definition
+  ingmax=Param[1]        # [g/d] Maximum ingestion rate
+  alpha=Param[2]         # [-] Feeding catabolism coefficient
+  betaprot=Param[3]      # [-] Assimilation coefficient for protein
+  betalip=Param[4]       # [-] Assimilation coefficient for lipid
+  betacarb=Param[5]      # [-] Assimilation coefficient for carbohydrates
+  epsprot=Param[6]       # [J/gprot] Energy content of protein
+  epslip=Param[7]        # [J/glip] Energy content of lipid
+  epscarb=Param[8]       # [J/gcarb] Energy content of carbohydrate
+  epsO2=Param[9]         # [J/gO2] Energy consumed by the respiration of 1g of oxygen
+  pk=Param[10]           # [1/day] Temperature coefficient for the fasting catabolism
+  k0=Param[11]           # [1/Celsius degree]  Fasting catabolism at 0 Celsius degree
+  m=Param[12]            # [-] Weight exponent for the anabolism
+  n=Param[13]            # [-] Weight exponent for the catabolism
+  betac=Param[14]        # [-]  Shape coefficient for the H(Tw) function
+  Tma=Param[15]          # [Celsius degree] Maximum lethal temperature for Dicentrarchus labrax
+  Toa=Param[16]          # [Celsius degree] Optimal temperature for Dicentrarchus labrax
+  Taa=Param[17]          # [Celsius degree] Lowest feeding temperature for Dicentrarchus labrax
+  omega=Param[18]        # [gO2/g] Oxygen consumption - weight loss ratio
+  a=Param[19]            # [J/gtissue] Energy content of fish tissue
+  k=Param[20]            # [-] Weight exponent for energy content
+  eff=Param[21]          # [-] Food ingestion efficiency
+  
+  # Food composition definition
+  Pcont=Food[1]       # [-] Percentage of proteins in the food
+  Lcont=Food[2]       # [-] Percentage of lipids in the food
+  Ccont=Food[3]       # [-] Percentage of carbohydrates in the food
+  
+  # Weight and resource
+  tmax    = 366                                   # number of days 
+  dt      = 1                                  # time step
+  # isave = 1
+  # nsave  <- floor(tmax/(dt*isave)) # no. of time slots to save
+  days<-(1:tmax)*dt
+  
+  weight <- rep(0,nsave)
+  weight[1]<- 30 # start size in grams
+  # 
+  # # vectors of the other important growth metrics: intake, functional response, assimilated energy and growth increment
+  fgT <- rep(0, nsave)
+  frT <- rep(0, nsave)
+  Tfun <- rep(0, nsave)
+  ing <- rep(0, nsave)
+  resource <- rep(0, nsave)
+  G <- rep(0, nsave)
+  ingvero <- rep(0, nsave)
+  epstiss <- rep(0, nsave)
+  assE <- rep(0, nsave)
+  Pexc <- rep(0, nsave)
+  Lexc <- rep(0, nsave)
+  Cexc <- rep(0, nsave)
+  exc <- rep(0, nsave)
+  Pwst <- rep(0, nsave)
+  Lwst <- rep(0, nsave)
+  Cwst <- rep(0, nsave)
+  wst <- rep(0, nsave)
+  anab <- rep(0, nsave)
+  catab <- rep(0, nsave)
+  metab <- rep(0, nsave)
+  O2 <- rep(0, nsave)
+  NH4 <- rep(0, nsave)
+  dw <- rep(0, nsave)
+
+  
+  # EQUATIONS
+  for (i in 1:(nsave-1)){
+    
+  # Forcing temperature
+  fgT[i]= exp(betac*(Temp[i]-Toa))*((Tma-Temp[i])/(Tma-Toa))^(betac*(Tma-Toa))   # Optimum Temperature dependence for ingestion
+  frT[i]= exp(pk*Temp[i])                                                       # Exponential Temperature dependence for catabolism
+  # Tfun[i]=cbind(fgT[i], frT[i])                                               # Output with temperature limitation functions
+  
+  # Ingested mass
+  ing[i]=ingmax*(weight[i]^m)*fgT[i]   # [g/d] Potential ingestion rate
+  # G=G*eff                      # [g/d] Ingested food (a part of the available food falls through the net)
+  resource[i] = 0.066*weight[i]^0.75 # this is taken from the salmon model
+  G[i] = eff*resource[i]
+  
+  # # Lowest feeding temperature threshold
+  # if (Temp<Taa) {
+  #   ing=0
+  # }
+  
+  # reduced feeding at temps higher than optimal temp
+  if (Temp[i]>Toa) {
+    ing[i] = 0
+  }
+  
+  # Available food limitation
+  if (ing[i] > G[i]) {
+    ingvero[i] = G[i]         # [g/d] Actual ingestion rate
+  }  else {
+    ingvero[i] = ing[i]     # [g/d] Actual ingestion rate
+  }
+  
+  # Energy content of somatic tissue [J/g] Source: Lupatsch et al. (2003)
+  epstiss[i] = a*weight[i]^k
+  
+  # Ingested energy
+  diet = Pcont*epsprot*betaprot+Lcont*epslip*betalip+Ccont*epscarb*betacarb # [J/g] Energy content of the ingested food
+  assE[i] = ingvero[i]*diet # [J/d] Ingested energy
+  
+  # Compute excretion (not sure if this is actually dissolved inorganic nutrients)
+  Pexc[i] = (1-betaprot)*Pcont*ingvero[i]  # Excreted proteins [g/d]
+  Lexc[i] = (1-betalip)*Lcont*ingvero[i]   # Excreted lipids [g/d]
+  Cexc[i] = (1-betacarb)*Ccont*ingvero[i]  # Excreted carbohydrates [g/d]
+  # exc[i]=cbind(Pexc[i],Lexc[i],Cexc[i])        # Output with excretion values
+  
+  # Compute waste (this is uneaten feed only - does not include solid faecal matter)
+  Pwst[i]=((G[i]/eff)-ingvero[i])*Pcont     # Proteins to waste [g/d]
+  Lwst[i]=((G[i]/eff)-ingvero[i])*Lcont     # Lipids to waste [g/d]
+  Cwst[i]=((G[i]/eff)-ingvero[i])*Ccont     # Carbohydrates to waste [g/d]
+  # wst[i]=cbind(Pwst[i],Cwst[i],Lwst[i])        # Output with waste values
+  
+  # Metabolism terms
+  anab[i]=assE[i]*(1-alpha)                    # Net anabolism [J/d]
+  catab[i]=epsO2*k0*frT[i]*(weight[i]^n)*omega    # Fasting catabolism [J/d]
+  # metab[i]=cbind(anab[i],catab[i])                # Output with metabolic rates
+  
+  # O2 and NH4 produced
+  O2[i]=catab[i]/epsO2          # O2 consumed [g02/d]
+  NH4[i]=O2[i]*0.06             # NH4 produced [gN/d]
+  
+  # Mass balance
+  dw[i] = (anab[i]-catab[i])/epstiss[i] # weight increment [g/d]
+  
+  weight[i+1] = weight[i] + dw[i]*dt
+  }
+  # Function outputs
+  output=data.frame(days, weight, dw, epstiss, Pexc, Lexc, Cexc, Pwst, Lwst, 
+                    Cwst, ing, ingvero, anab, catab, O2, NH4, resource, fgT, frT, Temp)
+  return(output) 
+}
+
+
+
+```
+
+Growth variable
+
+```{r}
+
+
+
+```
