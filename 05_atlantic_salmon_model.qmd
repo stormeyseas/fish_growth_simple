@@ -80,8 +80,8 @@ Salmon_ind_equations <- function(Param, Temp, Food){
   # Weight and resource
   tmax    = 366                                   # number of days 
   dt      = 1                                  # time step
-  # isave = 1
-  # nsave  <- floor(tmax/(dt*isave)) # no. of time slots to save
+  isave = 1
+  nsave  <- floor(tmax/(dt*isave)) # no. of time slots to save
   days<-(1:tmax)*dt
   
   weight <- rep(0,nsave)
@@ -185,11 +185,14 @@ Salmon_ind_equations <- function(Param, Temp, Food){
 
 
 
+output <- Salmon_ind_equations(Param = Param, Temp = Temp, Food = Food)
+
 ```
 
-Growth variable
+Integration of gr
 
 ```{r}
+
 
 
 

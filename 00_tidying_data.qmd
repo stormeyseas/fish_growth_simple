@@ -8,5 +8,17 @@ Setup
 
 ```{r}
 
+library(tidyverse)
+library(here)
+
+
+```
+
+Make input and output folder structure for species of interest
+```{r}
+
+species <- c("atlantic_salmon", "")
+
+
 ```
 

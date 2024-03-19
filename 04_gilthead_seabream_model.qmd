@@ -11,20 +11,14 @@ library(tidyverse)
 library(here)
 
 
-species <- "gilthead_seabrean"
+species <- "gilthead_seabream"
 
 ```
+
 
 Data loader module
 
 ```{r}
-
-#create folders for parameters and forcings
-filepaths <- c(sprintf(here("data/forcings/%s_forcings"), species), sprintf(here("data/parameters/%s_parameters"), species) )
-
-for (path in filepaths){if(!file.exists(path)){dir.create(path)}}
-
-
 
 # pull in data for interpolation
 temp_data <-  read.csv(sprintf(here("data/forcings/%s_forcings/Water_temperature.csv"), species), sep = ",", header = FALSE)
@@ -87,7 +81,7 @@ forcings <-  list(daysT, Tint, daysG, Gint)
 
 ### Individual model
 
-Preprocessing
+Preprocessing uses the interpolated and tidied data from the data loader
 
 ```{r}
 
@@ -273,14 +267,13 @@ ind_equations <- \(Param, Temp, Feed, Feed_avail){
   Fcs = ing*(Pcont*(1-betaprot) + Ccont*(1-betacarb) + Lcont*(1-betalip))
   
   
-  
   # EXPRESSIONS FOR NET CATABOLISM
   
   C = epsO2*k0*KTw*w^n
   
   
+  #energy content of somatic weight
   et = a*w^k
-  
   
   
   #Growth equation
