@@ -13,6 +13,8 @@ library(here)
 
 species <- "gilthead_seabream"
 
+this_path <- sprintf(here("data/%s"), species)
+
 ```
 
 
@@ -21,61 +23,72 @@ Data loader module
 ```{r}
 
 # pull in data for interpolation
-temp_data <-  read.csv(sprintf(here("data/forcings/%s_forcings/Water_temperature.csv"), species), sep = ",", header = FALSE)
 
-feed_rations <- read.csv(sprintf(here("data/forcings/%s_forcings/Feeding.csv"), species), sep = ",", header = FALSE)
+data_loader <- \(this_path){
+  
+  temp <-  read.csv(file.path(this_path, "forcings/Water_temperature.csv"), sep = ",", header = FALSE)
+  
+  feed <- read.csv(file.path(this_path, "forcings/Feeding.csv"), sep = ",", header = FALSE)
+  
+  params  <-  read.csv(file.path(this_path,"params/Parameters.csv"), sep = ",")
+  
+  timeT  <-  as.matrix(temp_data[, 1])
+  
+  temp  <-  as.double(as.matrix(temp_data[, 2]))
+  
+  timeG <-  as.matrix(feed_rations[, 1])
+  
+  feed <-  as.double(as.matrix(feed[, 2]))
+  
+  dates <-  params[22:23, 3] #start and end of the feeding trial
+  
+  t0 <-  min(as.numeric(as.Date(timeT[1], "%d/%m/%Y")), as.numeric(as.Date(timeG[1], "%d/%m/%Y"))) #This takes the earliest of the feeding dates and the SST date records
+  
+  ti <-  as.numeric(as.Date(dates[1], "%d/%m/%Y")) - t0 #integration start minus t0 (difference between integration start and the first input data)
+  
+  tf <-  as.numeric(as.Date(dates[2], "%d/%m/%Y")) - t0 #integration end minus t0 (difference between integration end and the first input data)
+  
+  timeTseries <-  as.numeric(as.Date(timeT, "%d/%m/%Y")) - t0 #creates day number time series for temperature
+  
+  timeGseries <-  as.numeric(as.Date(timeG, "%d/%m/%Y")) - t0 #creates day number times series for feeding
+  
+  Ttem <-  as.vector(matrix(0, nrow = ti - 1)) #
+  
+  Gtem <-  as.vector(matrix(0, nrow = ti - 1))
+  
+  i <-  ti:tf + 1
+  
+  Ttem2 <-  approx(timeTseries, temp, xout = i)
+  Gtem2 <-  approx(timeGseries, feed_amount, xout = i)
+  Tint <- c(Ttem, Ttem2$y)
+  Gint <-  c(Gtem, Gtem2$y)
+  
+  
+  daysT <- seq(as.Date(timeT[1], format = "%d/%m/%Y"), by = "days",   length = length(Tint))
+  daysG <- seq(as.Date(timeG[1], format = "%d/%m/%Y"), by = "days",  length = length(Tint))
+  
+  
+  if ((ti < (as.numeric(as.Date(timeT[1], "%d/%m/%Y")) - t0)) | 
+      (ti < (as.numeric(as.Date(timeG[1], "%d/%m/%Y")) - t0))) {
+    message("ERROR: forcings are beginning after the specified integration start\n")
+    message("Impossible to proceed with interpolation\n")
+  }
+  if ((ti > (as.numeric(as.Date(timeT[length(timeT)], "%d/%m/%Y")) - 
+             t0)) | (ti > (as.numeric(as.Date(timeG[length(timeG)], 
+                                              "%d/%m/%Y")) - t0))) {
+    message("ERROR: forcing are ending before the specified integration end\n")
+    message("Impossible to proceed with interpolation\n")
+  }
+  
+  forcings <-  list(daysT, Tint, daysG, Gint)
+  
+  return(forcings)
 
-params  <-  read.csv(sprintf(here("data/parameters/%s_parameters/Parameters.csv"), species), sep = ",")
-
-timeT  <-  as.matrix(temp_data[, 1])
-
-temp  <-  as.double(as.matrix(temp_data[, 2]))
-
-timeG <-  as.matrix(feed_rations[, 1])
-
-feed_amount <-  as.double(as.matrix(feed_rations[, 2]))
-    
-dates <-  params[22:23, 3] #start and end of the feeding trial
-
-t0 <-  min(as.numeric(as.Date(timeT[1], "%d/%m/%Y")), as.numeric(as.Date(timeG[1], "%d/%m/%Y"))) #This takes the earliest of the feeding dates and the SST date records
-
-ti <-  as.numeric(as.Date(dates[1], "%d/%m/%Y")) - t0 #integration start minus t0 (difference between integration start and the first input data)
-
-tf <-  as.numeric(as.Date(dates[2], "%d/%m/%Y")) - t0 #integration end minus t0 (difference between integration end and the first input data)
-
-timeTseries <-  as.numeric(as.Date(timeT, "%d/%m/%Y")) - t0 #creates day number time series for temperature
-
-timeGseries <-  as.numeric(as.Date(timeG, "%d/%m/%Y")) - t0 #creates day number times series for feeding
-
-Ttem <-  as.vector(matrix(0, nrow = ti - 1)) #
-
-Gtem <-  as.vector(matrix(0, nrow = ti - 1))
-
-i <-  ti:tf + 1
-
-Ttem2 <-  approx(timeTseries, temp, xout = i)
-Gtem2 <-  approx(timeGseries, feed_amount, xout = i)
-Tint <- c(Ttem, Ttem2$y)
-Gint <-  c(Gtem, Gtem2$y)
+}
 
 
-daysT <- seq(as.Date(timeT[1], format = "%d/%m/%Y"), by = "days",   length = length(Tint))
-daysG <- seq(as.Date(timeG[1], format = "%d/%m/%Y"), by = "days",  length = length(Tint))
+forcings <- data_loader(this_path = this_path)
 
-
- if ((ti < (as.numeric(as.Date(timeT[1], "%d/%m/%Y")) - t0)) | 
-        (ti < (as.numeric(as.Date(timeG[1], "%d/%m/%Y")) - t0))) {
-        message("ERROR: forcings are beginning after the specified integration start\n")
-        message("Impossible to proceed with interpolation\n")
-    }
-    if ((ti > (as.numeric(as.Date(timeT[length(timeT)], "%d/%m/%Y")) - 
-        t0)) | (ti > (as.numeric(as.Date(timeG[length(timeG)], 
-        "%d/%m/%Y")) - t0))) {
-        message("ERROR: forcing are ending before the specified integration end\n")
-        message("Impossible to proceed with interpolation\n")
-    }
-
-forcings <-  list(daysT, Tint, daysG, Gint)
 
 ```
 
@@ -85,102 +98,112 @@ Preprocessing uses the interpolated and tidied data from the data loader
 
 ```{r}
 
-message("Data preprocessing")
- 
-
-timeT = forcings[[1]]
-Tint = forcings[[2]]
-timeG = forcings[[3]]
-Gint = forcings[[4]]
-
-
-param_matrix <-  read.csv(sprintf(here("data/parameters/%s_parameters/Parameters.csv"), species), sep = ",")
-feed_comp <- read.csv(sprintf(here("data/forcings/%s_forcings/Food_characterization.csv"), species), sep = ",", header = FALSE)
-
-param_values <-  as.double(as.matrix(param_matrix[1:21, 3]))
-
-dates = param_matrix[22:23, 3] #start and end of integration
-
-IC <- as.double(as.matrix(param_matrix[24, 3])) # initial weight
-
-CS <-  as.double(as.matrix(param_matrix[25, 3])) # commercial size
-
-feed_contibutions <-  as.double(as.matrix(feed_comp[, 1]))
-
-t0<- min(as.numeric(as.Date(timeT[1], "%d/%m/%Y")), as.numeric(as.Date(timeG[1], 
-                                                                       "%d/%m/%Y")), as.numeric(as.Date(dates[1], "%d/%m/%Y")))
-timestep <- 1
-
-ti<- as.numeric(as.Date(dates[1], "%d/%m/%Y")) - t0
-
-tf <-  as.numeric(as.Date(dates[2], "%d/%m/%Y")) - t0
-
-weight <-  as.vector(matrix(0, nrow = ti))
-
-weight[ti] <-  IC #creates the initial weight at the start dates
-
-times <- cbind(ti, tf, timestep)
-
-Pcont = feed_contibutions[1]
-Lcont = feed_contibutions[2]
-Ccont = feed_contibutions[3]    
-
-message("The model will be executed with the following parameters:\n")
-
-#loop through parameters
-for (i in 1:21) {
-  cat(paste0(toString(param_matrix[i, 2]), ": ", toString(param_matrix[i, 
-                                                                       3]), " ", toString(param_matrix[i, 4])), "\n")
+input_preprocess <- \(this_path, these_forcings){
+  
+  message("Data preprocessing")
+  
+  
+  timeT = forcings[[1]]
+  Tint = forcings[[2]]
+  timeG = forcings[[3]]
+  Gint = forcings[[4]]
+  
+  
+  param_matrix <-  read.csv(file.path(this_path,"params/Parameters.csv"), sep = ",")
+  feed_comp <- read.csv(file.path(this_path, "forcings/Food_characterization.csv"), sep = ",", header = FALSE)
+  
+  param_values <-  as.double(as.matrix(param_matrix[1:21, 3]))
+  
+  dates = param_matrix[22:23, 3] #start and end of integration
+  
+  IC <- as.double(as.matrix(param_matrix[24, 3])) # initial weight
+  
+  CS <-  as.double(as.matrix(param_matrix[25, 3])) # commercial size
+  
+  feed_contibutions <-  as.double(as.matrix(feed_comp[, 1]))
+  
+  t0<- min(as.numeric(as.Date(timeT[1], "%d/%m/%Y")), as.numeric(as.Date(timeG[1], 
+                                                                         "%d/%m/%Y")), as.numeric(as.Date(dates[1], "%d/%m/%Y")))
+  timestep <- 1
+  
+  ti<- as.numeric(as.Date(dates[1], "%d/%m/%Y")) - t0
+  
+  tf <-  as.numeric(as.Date(dates[2], "%d/%m/%Y")) - t0
+  
+  weight <-  as.vector(matrix(0, nrow = ti))
+  
+  weight[ti] <-  IC #creates the initial weight at the start dates
+  
+  times <- cbind(ti, tf, timestep)
+  
+  Pcont = feed_contibutions[1]
+  Lcont = feed_contibutions[2]
+  Ccont = feed_contibutions[3]    
+  
+  message("The model will be executed with the following parameters:\n")
+  
+  #loop through parameters
+  for (i in 1:21) {
+    cat(paste0(toString(param_matrix[i, 2]), ": ", toString(param_matrix[i, 
+                                                                         3]), " ", toString(param_matrix[i, 4])), "\n")
+  }
+  cat(" \n")
+  cat("Weight initial condition is: ", toString(IC), " g\n")
+  cat(" \n")
+  cat("Integration is performed between ", toString(dates[1]), 
+      " and ", toString(dates[2]), "\n")
+  cat(" \n")
+  cat("The food has the following composition: \n")
+  cat(toString(Pcont * 100), "% proteins\n")
+  cat(toString(Lcont * 100), "% lipids\n")
+  cat(toString(Ccont * 100), "% carbohydrates\n")
+  cat(" \n")
+  cat("Commercial size is ", toString(CS), " g")
+  cat(" \n")
+  cat(" \n")
+  
+  message("Forcings are represented in graphs available at the following folder\n")
+  cat(file.path(this_path, "figures\n\n"))
+  
+  
+  message("Temperature plots")
+  
+  Tintsave = Tint[(ti + 1):tf]
+  SaveName <- file.path(this_path, "figures/Temperature_plot.jpg")
+  
+  #Plot water temperature
+  jpeg(SaveName, 800, 600) 
+  days <- seq(as.Date(dates[1], format = "%d/%m/%Y"), by = "days",  length = tf - ti)
+  plot(days, Tintsave, ylab = "Water temperature (Celsius degrees)",  xlab = "", xaxt = "n", type = "l", cex.lab = 1.4)
+  labDates <- seq(as.Date(dates[1], format = "%d/%m/%Y"), tail(days,   1), by = "months")
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2) 
+  dev.off()
+  
+  
+  message("Feeding plots")
+  
+  Gintsave = Gint[(ti + 1):tf]
+  SaveName <-  file.path(this_path, "figures/Feeding.jpg")
+  
+  #plot feeding
+  jpeg(SaveName, 800, 600)
+  days <- seq(as.Date(dates[1], format = "%d/%m/%Y"), by = "days", length = tf - ti)
+  plot(days, Gintsave, ylab = "Feed (g/d)", xlab = "", xaxt = "n", type = "l", cex.lab = 1.4)
+  labDates <- seq(as.Date(dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  dev.off()
+  
+  
+  
+  outputs <- list(param_values, Tint, Gint, feed_contibutions, IC, times, dates, 
+                 CS)
+  
+  return(outputs)
+  
 }
-cat(" \n")
-cat("Weight initial condition is: ", toString(IC), " g\n")
-cat(" \n")
-cat("Integration is performed between ", toString(dates[1]), 
-    " and ", toString(dates[2]), "\n")
-cat(" \n")
-cat("The food has the following composition: \n")
-cat(toString(Pcont * 100), "% proteins\n")
-cat(toString(Lcont * 100), "% lipids\n")
-cat(toString(Ccont * 100), "% carbohydrates\n")
-cat(" \n")
-cat("Commercial size is ", toString(CS), " g")
-cat(" \n")
-cat(" \n")
 
-cat("Forcings are represented in graphs available at the following folder\n")
-message(sprintf(here("figures/forcings/%s_plots"), species))
+outputs <- input_preprocess(this_path = this_path, these_forcings = forcings)
 
-message("Temperature plots")
-
-Tintsave = Tint[(ti + 1):tf]
-SaveName <- sprintf(here("figures/forcings/%s_plots/%s_water_temperature.jpg"), species, species)
-
-#Plot water temperature
-jpeg(SaveName, 800, 600) 
-days <- seq(as.Date(dates[1], format = "%d/%m/%Y"), by = "days",  length = tf - ti)
-plot(days, Tintsave, ylab = "Water temperature (Celsius degrees)",  xlab = "", xaxt = "n", type = "l", cex.lab = 1.4)
-labDates <- seq(as.Date(dates[1], format = "%d/%m/%Y"), tail(days,   1), by = "months")
-axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2) 
-dev.off()
-
-
-message("Feeding plots")
-
-Gintsave = Gint[(ti + 1):tf]
-SaveName <-  sprintf(here("figures/forcings/%s_plots/%s_feeding.jpg"), species, species)
-
-#plot feeding
-jpeg(SaveName, 800, 600)
-days <- seq(as.Date(dates[1], format = "%d/%m/%Y"), by = "days", length = tf - ti)
-plot(days, Gintsave, ylab = "Feed (g/d)", xlab = "", xaxt = "n", type = "l", cex.lab = 1.4)
-labDates <- seq(as.Date(dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
-axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
-dev.off()
-
-
-
-output <- list(param_values, Tint, Gint, feed_contibutions, IC, times, dates, 
-              CS)
 
 ```
 
@@ -188,100 +211,143 @@ output <- list(param_values, Tint, Gint, feed_contibutions, IC, times, dates,
 Model equations
 ```{r}
 
-Param <- output[[1]]
-Temp <- output[[2]]
-Feed_avail <- output[[3]]
-Feed <- output[[4]]
+Param <- outputs[[1]]
+Temp <- outputs[[2]]
+Feeding <- outputs[[3]]
+Feed <- outputs[[4]]
+IC <- outputs[[5]]
+times <- outputs[[6]]
 
-ind_equations <- \(Param, Temp, Feed, Feed_avail){
+
+
+RK_solver <- \(Param, Temp, Feeding, Feed, IC, times){
   
-  #Parameters
-  ingmax  <-  Param[1]  #maximum ingrestion rate (g/d)
-  alpha <-  Param[2] # feeding catabolism coefficient
-  betaprot  <-  Param[3] # assimilation coefficient for protein
-  betalip <-  Param[4]  # assimilation coefficient for lipid
-  betacarb <-  Param[5]# assimilation coefficient for carbohydrate
-  epsprot <-  Param[6]# energy content of protein (J/g protein)
-  epslip <-  Param[7]#energy content of lipid (J/g lipid)
-  epscarb <-  Param[8]# energy content of carbohydrates (J/g carbohydrate)
-  epsO2<-  Param[9] # energy consumed by respiration of 1 g of O2
-  pk <-  Param[10]# temperature coefficient for fasting catabolism
-  k0 <-  Param[11]# fasting catabolism at 0oC
-  m <-  Param[12]# weight exponent for the anabolism
-  n <-  Param[13]# weight exponent for the catabolism
-  betac <-  Param[14]# shape coefficient for H(Tw) function
-  Tma <-  Param[15]#maximum lethal temperature for Sparus aurata
-  Toa <-  Param[16]#optimal temperature for Sparus aurata
-  Taa <- Param[17] #Lowest feeding temperature for sparus aurata
-  omega <-  Param[18] #oxygen consumption weight loss ratio
-  a  <-  Param[19]#energy content of fish
-  k <- Param[20] #weight exponent for energy content
-  eff <-  Param[21]#food ingestion efficiency
+  ti = times[1]
+  tf = times[2]
+  timestep = times[3]
+  weight = as.vector(matrix(0, nrow = ti))
+  weight[ti] = IC
+  wst = as.matrix(matrix(0, nrow = ti, ncol = 3))
+  exc = as.matrix(matrix(0, nrow = ti, ncol = 3))
+  ing = as.vector(matrix(0, nrow = ti))
+  ingvero = as.vector(matrix(0, nrow = ti))
+  tfun = as.matrix(matrix(0, nrow = ti, ncol = 2))
+  metab = as.matrix(matrix(0, nrow = ti, ncol = 2))
+  O2 = as.matrix(matrix(0, nrow = ti, ncol = 2))
+  NH4 = as.matrix(matrix(0, nrow = ti, ncol = 2))
   
-  
-  # FORCINGS
-  
-  
-  #Feed composition
-  
-  Pcont=Feed[1]       # Percentage of proteins in the food
-  Lcont=Feed[2]       # Percentage of lipids in the food
-  Ccont=Feed[3]       #  Percentage of carbohydrates in the food
-  
-  #Temperature
-  Temp <- Temp # water temperature oC
-  
-  #Feeding 
-  Feed_avail <- Feed_avail # g of food per day
-  
-  
-  #H(Tw) function
-  
-  HTw = (((Tma-Temp)/(Tma-Toa))^betac*Tma) * exp(betac*(Temp-Toa))
-  
-  # K(Tw) function 
-  KTw = exp(pk*Temp)
-  
-  #weight 
-  w = output[[5]]
-  
-  
-  # EXPRESSIONS FOR NET ANABOLISM
-  
-  ing = ingmax*HTw*(w^m)
-  
-  #food limitation
-  if(ing >= Feed_avail){
-    ing = Feed_avail # 
-  } else {
-    ing = ing # otherwise use actual food ingrestion rate
-  }
-  
-  #temperature limitation
-  
-  if(Temp>Tma){
-    ing = 0
-  }
-  
-  A = (1-alpha)*ing*(Pcont*epsprot*betaprot + Ccont*epscarb*betacarb + Lcont*epslip*betalip) #Anabolism
-  Fcs = ing*(Pcont*(1-betaprot) + Ccont*(1-betacarb) + Lcont*(1-betalip))
-  
-  
-  # EXPRESSIONS FOR NET CATABOLISM
-  
-  C = epsO2*k0*KTw*w^n
-  
-  
-  #energy content of somatic weight
-  et = a*w^k
-  
-  
-  #Growth equation
-  
-  dw_dt <- (A-C)/et
+  for (t in ti:(tf - 1)) {
+    Tapp = Temp[t]
+    Gapp = Feeding[t]
+    
+    output <- \(Param, Temp, Feed, Gapp){
+      
+      #Parameters
+      ingmax  <-  Param[1]  #maximum ingrestion rate (g/d)
+      alpha <-  Param[2] # feeding catabolism coefficient
+      betaprot  <-  Param[3] # assimilation coefficient for protein
+      betalip <-  Param[4]  # assimilation coefficient for lipid
+      betacarb <-  Param[5]# assimilation coefficient for carbohydrate
+      epsprot <-  Param[6]# energy content of protein (J/g protein)
+      epslip <-  Param[7]#energy content of lipid (J/g lipid)
+      epscarb <-  Param[8]# energy content of carbohydrates (J/g carbohydrate)
+      epsO2<-  Param[9] # energy consumed by respiration of 1 g of O2
+      pk <-  Param[10]# temperature coefficient for fasting catabolism
+      k0 <-  Param[11]# fasting catabolism at 0oC
+      m <-  Param[12]# weight exponent for the anabolism
+      n <-  Param[13]# weight exponent for the catabolism
+      betac <-  Param[14]# shape coefficient for H(Tw) function
+      Tma <-  Param[15]#maximum lethal temperature for Sparus aurata
+      Toa <-  Param[16]#optimal temperature for Sparus aurata
+      Taa <- Param[17] #Lowest feeding temperature for sparus aurata
+      omega <-  Param[18] #oxygen consumption weight loss ratio
+      a  <-  Param[19]#energy content of fish
+      k <- Param[20] #weight exponent for energy content
+      eff <-  Param[21]#food ingestion efficiency
+      
+      
+      # FORCINGS
+      
+      #Feed composition
+      
+      Pcont=Feed[1]       # Percentage of proteins in the food
+      Lcont=Feed[2]       # Percentage of lipids in the food
+      Ccont=Feed[3]       #  Percentage of carbohydrates in the food
+      
+      
+      #Temperature
+      Temp <- Temp # water temperature oC
+      
+      #Feeding 
+      Gapp <- Gapp # g of food per day
+      
+      
+      #H(Tw) function
+      temperaturefun = (((Tma-Temp)/(Tma-Toa))^betac*Tma) * exp(betac*(Temp-Toa))
+      
+      # K(Tw) function 
+      KTw = exp(pk*Temp)
+      
+      #weight 
+      weight = if_else(i = ti, TRUE = outputs[[5]], FALSE = weights[i])
+      
+      
+      # EXPRESSIONS FOR NET ANABOLISM
+      
+      ing = ingmax*temperaturefun*(weight^m) # Potential ingestion rate with maximum ingrestion scaled 
+      
+      #food limitation
+      if(ing >= G){
+        ing = G # 
+      } else {
+        ing = ing # otherwise use actual food ingrestion rate
+      }
+      
+      #temperature limitation
+      
+      if(Temp>Tma){
+        ing = 0
+      }
+      
+      A = (1-alpha)*ing*(Pcont*epsprot*betaprot + Ccont*epscarb*betacarb + Lcont*epslip*betalip) #Anabolism
+      Fcs = ing*(Pcont*(1-betaprot) + Ccont*(1-betacarb) + Lcont*(1-betalip))
+      
+      
+      # EXPRESSIONS FOR NET CATABOLISM
+      
+      C = epsO2*k0*KTw*w^n
+      
+      
+      #energy content of somatic weight
+      epstiss = a*w^k
+      
+      
+      #Growth equation
+      dw <- (A-C)/epstiss
+      
+      return(dw, excretion, ingestion, ingestionvero, temperaturefun, metabolism, oxygen, ammonia)
+      
+      
+    }
+    
+
   
   
 }
+  
+  
+}
+
+
+
+
+
+
+
+
+ind_equations(Param = outputs[[1]], Temp = outputs[[2]], Feed = outputs[[4]], Feeding = output[[3]])
+
+
 
 
 
