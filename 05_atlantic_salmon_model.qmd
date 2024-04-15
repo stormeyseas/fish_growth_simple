@@ -189,9 +189,11 @@ output <- Salmon_ind_equations(Param = Param, Temp = Temp, Food = Food)
 
 ```
 
-Integration of gr
+Integration of outputs
 
 ```{r}
+
+
 
 
 

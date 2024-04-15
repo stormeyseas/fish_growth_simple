@@ -17,7 +17,6 @@ this_path <- sprintf(here("data/%s"), species)
 
 ```
 
-
 Data loader module
 
 ```{r}
@@ -32,11 +31,11 @@ data_loader <- \(this_path){
   
   params  <-  read.csv(file.path(this_path,"params/Parameters.csv"), sep = ",")
   
-  timeT  <-  as.matrix(temp_data[, 1])
+  timeT  <-  as.matrix(temp[, 1])
   
-  temp  <-  as.double(as.matrix(temp_data[, 2]))
+  temp  <-  as.double(as.matrix(temp[, 2]))
   
-  timeG <-  as.matrix(feed_rations[, 1])
+  timeG <-  as.matrix(feed[, 1])
   
   feed <-  as.double(as.matrix(feed[, 2]))
   
@@ -59,7 +58,7 @@ data_loader <- \(this_path){
   i <-  ti:tf + 1
   
   Ttem2 <-  approx(timeTseries, temp, xout = i)
-  Gtem2 <-  approx(timeGseries, feed_amount, xout = i)
+  Gtem2 <-  approx(timeGseries, feed, xout = i)
   Tint <- c(Ttem, Ttem2$y)
   Gint <-  c(Gtem, Gtem2$y)
   
@@ -98,19 +97,22 @@ Preprocessing uses the interpolated and tidied data from the data loader
 
 ```{r}
 
+#test function
+these_forcings <- forcings
+
 input_preprocess <- \(this_path, these_forcings){
   
   message("Data preprocessing")
   
   
-  timeT = forcings[[1]]
-  Tint = forcings[[2]]
-  timeG = forcings[[3]]
-  Gint = forcings[[4]]
+  timeT = these_forcings[[1]]
+  Tint = these_forcings[[2]]
+  timeG = these_forcings[[3]]
+  Gint = these_forcings[[4]]
   
   
   param_matrix <-  read.csv(file.path(this_path,"params/Parameters.csv"), sep = ",")
-  feed_comp <- read.csv(file.path(this_path, "forcings/Food_characterization.csv"), sep = ",", header = FALSE)
+  feed_comp <- read.csv(file.path(this_path, "forcings/Food_characterization.csv"), sep = ",", header = FALSE) 
   
   param_values <-  as.double(as.matrix(param_matrix[1:21, 3]))
   
@@ -136,9 +138,9 @@ input_preprocess <- \(this_path, these_forcings){
   
   times <- cbind(ti, tf, timestep)
   
-  Pcont = feed_contibutions[1]
-  Lcont = feed_contibutions[2]
-  Ccont = feed_contibutions[3]    
+  Pcont <-  feed_contibutions[1]
+  Lcont  <-  feed_contibutions[2]
+  Ccont <-  feed_contibutions[3]    
   
   message("The model will be executed with the following parameters:\n")
   
@@ -207,145 +209,237 @@ outputs <- input_preprocess(this_path = this_path, these_forcings = forcings)
 
 ```
 
-
 Model equations
+
 ```{r}
 
-Param <- outputs[[1]]
-Temp <- outputs[[2]]
-Feeding <- outputs[[3]]
-Feed <- outputs[[4]]
-IC <- outputs[[5]]
-times <- outputs[[6]]
+these_params <- outputs[[1]]
+these_temps <- outputs[[2]]
+this_feeding <- outputs[[3]]
+this_feed <- outputs[[4]]
+this_initial_condition <- outputs[[5]]
+these_start_end_times <- outputs[[6]]
 
 
 
-RK_solver <- \(Param, Temp, Feeding, Feed, IC, times){
+RK_solver <- \(these_params, these_temps, this_feeding, this_feed, this_initial_condition, these_start_end_times){
   
-  ti = times[1]
-  tf = times[2]
-  timestep = times[3]
-  weight = as.vector(matrix(0, nrow = ti))
-  weight[ti] = IC
-  wst = as.matrix(matrix(0, nrow = ti, ncol = 3))
-  exc = as.matrix(matrix(0, nrow = ti, ncol = 3))
-  ing = as.vector(matrix(0, nrow = ti))
-  ingvero = as.vector(matrix(0, nrow = ti))
-  tfun = as.matrix(matrix(0, nrow = ti, ncol = 2))
-  metab = as.matrix(matrix(0, nrow = ti, ncol = 2))
-  O2 = as.matrix(matrix(0, nrow = ti, ncol = 2))
-  NH4 = as.matrix(matrix(0, nrow = ti, ncol = 2))
+  ti <- these_start_end_times[1]
+  tf <- these_start_end_times[2]
+  timestep <- these_start_end_times[3]
+  weight <- as.vector(matrix(0, nrow = ti))
+  weight[ti] <- IC
+  wst <- as.matrix(matrix(0, nrow = ti, ncol = 3))
+  exc <- as.matrix(matrix(0, nrow = ti, ncol = 3))
+  ing <- as.matrix(matrix(0, nrow = ti))
+  ingvero <- as.vector(matrix(0, nrow = ti))
+  tfun <- as.matrix(matrix(0, nrow = ti, ncol = 2))
+  metab <- as.matrix(matrix(0, nrow = ti, ncol = 2))
+  O2 <- as.matrix(matrix(0, nrow = ti, ncol = 2))
+  NH4 <- as.matrix(matrix(0, nrow = ti, ncol = 2))
   
   for (t in ti:(tf - 1)) {
-    Tapp = Temp[t]
-    Gapp = Feeding[t]
+    this_temp <-  these_temps[t]
+    this_feed_avail <-  this_feeding[t]
+    this_starting_weight <- weight[t]
     
-    output <- \(Param, Temp, Feed, Gapp){
+  equations <- \(these_params, this_temp, this_feed, this_feed_avail, this_starting_weight){
       
       #Parameters
-      ingmax  <-  Param[1]  #maximum ingrestion rate (g/d)
-      alpha <-  Param[2] # feeding catabolism coefficient
-      betaprot  <-  Param[3] # assimilation coefficient for protein
-      betalip <-  Param[4]  # assimilation coefficient for lipid
-      betacarb <-  Param[5]# assimilation coefficient for carbohydrate
-      epsprot <-  Param[6]# energy content of protein (J/g protein)
-      epslip <-  Param[7]#energy content of lipid (J/g lipid)
-      epscarb <-  Param[8]# energy content of carbohydrates (J/g carbohydrate)
-      epsO2<-  Param[9] # energy consumed by respiration of 1 g of O2
-      pk <-  Param[10]# temperature coefficient for fasting catabolism
-      k0 <-  Param[11]# fasting catabolism at 0oC
-      m <-  Param[12]# weight exponent for the anabolism
-      n <-  Param[13]# weight exponent for the catabolism
-      betac <-  Param[14]# shape coefficient for H(Tw) function
-      Tma <-  Param[15]#maximum lethal temperature for Sparus aurata
-      Toa <-  Param[16]#optimal temperature for Sparus aurata
-      Taa <- Param[17] #Lowest feeding temperature for sparus aurata
-      omega <-  Param[18] #oxygen consumption weight loss ratio
-      a  <-  Param[19]#energy content of fish
-      k <- Param[20] #weight exponent for energy content
-      eff <-  Param[21]#food ingestion efficiency
+      ingmax  <-  these_params[1]  #maximum ingrestion rate (g/d)
+      alpha <-  these_params[2] # feeding catabolism coefficient
+      betaprot  <-  these_params[3] # assimilation coefficient for protein
+      betalip <-  these_params[4]  # assimilation coefficient for lipid
+      betacarb <-  these_params[5]# assimilation coefficient for carbohydrate
+      epsprot <-  these_params[6] # energy content of protein (J/g protein)
+      epslip <-  these_params[7] #energy content of lipid (J/g lipid)
+      epscarb <-  these_params[8] # energy content of carbohydrates (J/g carbohydrate)
+      epsO2<-  these_params[9] # energy consumed by respiration of 1 g of O2
+      pk <-  these_params[10] # temperature coefficient for fasting catabolism
+      k0 <-  these_params[11] # fasting catabolism at 0oC
+      m <-  these_params[12] # weight exponent for the anabolism
+      n <-  these_params[13] # weight exponent for the catabolism
+      betac <-  these_params[14] # shape coefficient for H(Tw) function
+      Tma <-  these_params[15] #maximum lethal temperature for Sparus aurata
+      Toa <-  these_params[16] #optimal temperature for Sparus aurata
+      Taa <- these_params[17] #Lowest feeding temperature for sparus aurata
+      omega <-  these_params[18] #oxygen consumption weight loss ratio
+      a  <-  these_params[19] #energy content of fish
+      k <- these_params[20] #weight exponent for energy content
+      eff <-  these_params[21] #food ingestion efficiency
       
       
       # FORCINGS
       
       #Feed composition
       
-      Pcont=Feed[1]       # Percentage of proteins in the food
-      Lcont=Feed[2]       # Percentage of lipids in the food
-      Ccont=Feed[3]       #  Percentage of carbohydrates in the food
+      Pcont=this_feed[1]       # Percentage of proteins in the food
+      Lcont=this_feed[2]       # Percentage of lipids in the food
+      Ccont=this_feed[3]       #  Percentage of carbohydrates in the food
       
       
-      #Temperature
-      Temp <- Temp # water temperature oC
+      ######
       
-      #Feeding 
-      Gapp <- Gapp # g of food per day
+      #temp
+      this_temp <- this_temp
       
-      
-      #H(Tw) function
-      temperaturefun = (((Tma-Temp)/(Tma-Toa))^betac*Tma) * exp(betac*(Temp-Toa))
-      
-      # K(Tw) function 
-      KTw = exp(pk*Temp)
-      
-      #weight 
-      weight = if_else(i = ti, TRUE = outputs[[5]], FALSE = weights[i])
+      #feed
+       this_feed_avail <- this_feed_avail
       
       
       # EXPRESSIONS FOR NET ANABOLISM
       
-      ing = ingmax*temperaturefun*(weight^m) # Potential ingestion rate with maximum ingrestion scaled 
+      #H(Tw) function - temperature dependence function for anabolism
+      HTw = (((Tma-temp_local)/(Tma-Toa))^betac*Tma) * exp(betac*(temp_local-Toa))
+    
+      ing_local = ingmax*HTw*(this_starting_weight^m) # Potential ingestion rate with maximum ingestion scaled 
+      
+      #temperature limitation - no feeding over lethal temperatures, no feeding below minimum feeding temperatures
+       if(temp_local>Tma | temp_local<Taa){
+        ing_local <- 0
+      }
       
       #food limitation
-      if(ing >= G){
-        ing = G # 
-      } else {
-        ing = ing # otherwise use actual food ingrestion rate
-      }
+      ingvero_local = if_else(ing_local>=this_feed_avail, true = this_feed_avail, false = ing_local) #creates feed availability as the ceiling for ingestion
       
-      #temperature limitation
+      #Anabolism 
+      anab = (1-alpha)*ingvero_local*(Pcont*epsprot*betaprot + Ccont*epscarb*betacarb + Lcont*epslip*betalip) # [J day-1]
       
-      if(Temp>Tma){
-        ing = 0
-      }
-      
-      A = (1-alpha)*ing*(Pcont*epsprot*betaprot + Ccont*epscarb*betacarb + Lcont*epslip*betalip) #Anabolism
-      Fcs = ing*(Pcont*(1-betaprot) + Ccont*(1-betacarb) + Lcont*(1-betalip))
-      
+      ######
       
       # EXPRESSIONS FOR NET CATABOLISM
       
-      C = epsO2*k0*KTw*w^n
+      # K(Tw) function - temperature dependence function for catabolism
+      KTw = exp(pk*temp_local)
       
+      #Catabolism
+      catab = epsO2*k0*KTw*this_starting_weight^n #(J day-1)
+      
+      
+      # Respiration 
+      oxygen <- k0*KTw*(this_starting_weight^n) #daily respiration rate (g O2 day-1)
+      O2 <- c(0,oxygen)
+      
+      ammonia <- c(0, oxygen*0.06)
+      
+      #Anabolic and catabolic temperature functions
+      temperaturefun <- c(HTw, KTw)
+      
+      ######
+      
+      #METABOLISM AND GROWTH
       
       #energy content of somatic weight
-      epstiss = a*w^k
+      epstiss = a*this_starting_weight^k
       
+      #metabolism
+      metab_local = c(anab,catab)
+    
       
       #Growth equation
-      dw <- (A-C)/epstiss
+      dw <- (anab-catab)/epstiss
       
-      return(dw, excretion, ingestion, ingestionvero, temperaturefun, metabolism, oxygen, ammonia)
+      
+      # WASTE
+      
+      #Faeces
+      Pexc = ingvero_local*(Pcont*(1-betaprot))
+      Cexc = ingvero_local*(Ccont*(1-betacarb))
+      Lexc = ingvero_local*(Lcont*(1-betalip))
+      exc_local <- c(Pexc, Cexc, Lexc)
+      
+      #Waste feed 
+      wst <- if_else(this_feed_avail >= ingvero_local, true =  this_feed_avail - ingvero_local, false = 0)
+      Pwst <- wst*Pcont
+      Lwst <- wst*Lcont
+      Cwst <- wst*Ccont
+      wst_local <- c(Pwst,Lwst,Cwst)
+      
+      
+      output <- list(dw, exc_local, wst_local, ing_local, ingvero_local, temperaturefun, metab_local, O2, ammonia)
+      
+      return(output)
       
       
     }
     
-
+  output1 <- equations(these_params = these_params, this_temp = this_temp, this_feed = this_feed, this_feed_avail = this_feed_avail, this_starting_weight = weight[t])
+  
+  dw <- unlist(output1[1])
+  
+  k1 <-  timestep*dw
+  
+  Temp_approx <-  approx(seq(from = 1, to = tf, by = timestep), 
+            these_temps, xout = (t + timestep/2))
+  
+  Feeding_approx <- approx(seq(from = 1, to = tf, by = timestep), 
+            this_feeding, xout = (t + timestep/2))
+  
+  output2 <- equations(these_params =  these_params, this_temp =  Temp_approx$y, this_feed_avail = Feeding_approx$y, this_feed = this_feed, this_starting_weight = weight[t] + k1/2)
+  
+  dw <-  unlist(output2[1])
+  
+  k2 <- timestep * dw
+  
+  Temp_approx <-  approx(seq(from = 1, to = tf, by = timestep), 
+                         these_temps, xout = (t + timestep/2))
+  
+  Feeding_approx <-  approx(seq(from = 1, to = tf, by = timestep), 
+                            this_feeding, xout = (t + timestep/2))
+  
+  output3 <- equations(these_params = these_params, this_temp =  Temp_approx$y, this_feed_avail =  Feeding_approx$y, this_feed =  this_feed, 
+                       this_starting_weight = weight[t] + k2/2)
+  
+  dw <-  unlist(output3[1])
+  
+  k3 <-  timestep * dw
+  
+  Temp_approx <-  these_temps[t + timestep]
+  
+  Feeding_approx <-  this_feeding[t + timestep]
+  
+  output4 <- equations(these_params =  these_params, this_temp = Temp_approx, this_feed_avail = Feeding_approx, this_feed = this_feed, 
+                       this_starting_weight = weight[t] + k3)
+  
+  dw <-  unlist(output4[1])
+  
+  k4 <- timestep * dw
+  
+  weight[t + timestep] <-  weight[t] + (k1 + 2 * k2 + 2 * k3 + k4)/6
+  
+  output5 <- equations(these_params =  these_params, this_temp = these_temps[t + timestep], 
+                       this_feed_avail =  this_feeding[t + timestep], this_feed = this_feed, this_starting_weight =  weight[t + timestep])
+  
+  excretion <- output5[[2]]
+  waste <- output5[[3]]
+  ingestion <- unlist(output5[4])
+  ingestionvero <- unlist(output5[5])
+  temperaturefun <- output5[[6]]
+  metabolism <- output5[[7]]
+  oxygen <- output5[[8]]
+  ammonia <- output5[[9]]
+  #add to next round
+  exc <- rbind(exc, excretion)
+  wst <- rbind(wst, waste)
+  ing <- c(ing, ingestion)
+  ingvero <- c(ingvero, ingestionvero)
+  tfun <- rbind(tfun, temperaturefun) 
+  metab <- rbind(metab, metabolism)
+  O2 <- rbind(O2, oxygen)
+  NH4 <- rbind(NH4, ammonia)
+  
+  }
+  
+  RK_output <- 
+  
   
   
 }
-  
-  
-}
 
 
 
 
 
-
-
-
-ind_equations(Param = outputs[[1]], Temp = outputs[[2]], Feed = outputs[[4]], Feeding = output[[3]])
 
 
 
@@ -468,15 +562,11 @@ Salmon_ind_equations <- function(Param, Temp, Food){
 
 
 param_matrix
+
 ```
 
-
-
-
-
-
-
 Main function
+
 ```{r}
 
 
@@ -606,4 +696,3 @@ cat("End")
 return(out_post)
 
 ```
-
