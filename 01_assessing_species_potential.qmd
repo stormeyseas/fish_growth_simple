@@ -22,7 +22,7 @@ source("src/dir.R")
 
 ```
 
-Pull in FAO data for aquaculture production
+Pull in FAO data for aquaculture production.
 
 ```{r}
 
@@ -145,7 +145,7 @@ ggsave("explore/cottrell_explore/global_proportion_finfish_by_country.jpg", dpi 
 Species decided on:
 
 | Common name          | Scientific name                                                                             |
-|:----------------|:------------------------------------------------------|
+|:-------------------|:---------------------------------------------------|
 | Atlantic salmon      | Salmo salar                                                                                 |
 | Other salmonids      | Generalised multi-species model - incl. Oncorhynchus mykiss and Oncorhynchus kisutch (Coho) |
 | European seabass     | Dicentrarchus labrax                                                                        |
