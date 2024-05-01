@@ -10,9 +10,11 @@ Setup
 
 library(tidyverse)
 library(here)
+library(qs)
 
 
 #model functions
+source("src/dir.R")
 source("src/model_functions.R")
 
 
@@ -50,7 +52,7 @@ species <- c("atlantic_salmon",
 
 #deploy data folder structure for species 
 
-map(species, create_species_folders)
+map(.x = species, .f = create_species_folders)
 
 
  
@@ -58,3 +60,17 @@ map(species, create_species_folders)
 
 
 ```
+
+
+Pull in mariculture locations data from Clawson et al 2022 and save the species groups of interest
+
+```{r}
+
+
+farm_locations <- read.csv(file.path(rdsi_dir, "raw_data/aquaculture-locations/all_marine_aquaculture_farms_sources_final.csv")) |> 
+  filter(species_group %in% c("Salmonidae fish", "General marine fish"))
+
+qsave(x = farm_locations, file = "data/_general_data/farm_locations.qs") 
+
+```
+
