@@ -16,12 +16,11 @@ library(here)
 source(here("src/model_functions.R"))
 
 #species paths
-species <- "gilthead_seabream"
+this_species <- "gilthead_seabream"
 this_path <- sprintf(here("data/%s"), species)
 
 
 ```
-
 
 Create and tidy inputs
 
@@ -42,11 +41,7 @@ inputs <- preprocess(this_path = this_path, these_forcings = forcings)
 
 ```{r}
 
-model_output <- model(this_path = this_path, forcings = forcings, this_species = species)
+model_output <- model(this_path = this_path, forcings = forcings, this_species = this_species)
 
 
 ```
-
-
-
-
