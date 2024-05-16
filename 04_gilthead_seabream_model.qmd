@@ -17,7 +17,7 @@ source(here("src/model_functions.R"))
 
 #species paths
 this_species <- "gilthead_seabream"
-this_path <- sprintf(here("data/%s"), species)
+this_path <- sprintf(here("data/%s"), this_species)
 
 
 ```

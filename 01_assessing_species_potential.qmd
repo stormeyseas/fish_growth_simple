@@ -147,7 +147,7 @@ aquaculture_prod |> filter(grepl("rouper", asfis_species_name_2))
 Species decided on:
 
 | Common name          | Scientific name                                                                             |
-|:-------------------|:---------------------------------------------------|
+|:--------------------|:--------------------------------------------------|
 | Atlantic salmon      | Salmo salar                                                                                 |
 | Other salmonids      | Generalised multi-species model - incl. Oncorhynchus mykiss and Oncorhynchus kisutch (Coho) |
 | European seabass     | Dicentrarchus labrax                                                                        |
