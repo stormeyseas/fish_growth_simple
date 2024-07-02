@@ -18,6 +18,20 @@ source("src/dir.R")
 source("src/model_functions.R")
 
 
+#species of interest
+
+species <- c("atlantic_salmon", 
+             "general_salmonid", 
+             "european_seabass", 
+             "gilthead_seabream", 
+             "large_yellow_croaker", 
+             "japanese_seabass",
+             "japanese_amberjack",
+             "general_grouper",
+             "pompano",
+             "milkfish")
+
+
 
 ```
 
@@ -35,25 +49,9 @@ Make input and output folder structure for species of interest
 ```{r}
 
 
-species <- c("atlantic_salmon", 
-             "general_salmonid", 
-             "european_seabass", 
-             "gilthead_seabream", 
-             "large_yellow_croaker", 
-             "japanese_seabass",
-             "japanese_amberjack",
-             "general_grouper",
-             "pompano",
-             "milkfish")
-
-
 #deploy data folder structure for species 
 
 map(.x = species, .f = create_species_folders)
-
-
- 
-
 
 
 ```
@@ -69,3 +67,37 @@ farm_locations <- read.csv(file.path(rdsi_dir, "raw_data/aquaculture-locations/a
 qsave(x = farm_locations, file = "data/_general_data/farm_locations.qs") 
 
 ```
+
+Modify Feed characterisation
+
+```{r}
+
+Food_charactisation_list <- 
+  read_csv("data/_general_data/diets/protein_lipid_carb_summaries.csv") |> 
+  select(-c(5)) |> 
+  pivot_longer(names_to = "nutrient", values_to = "prop", cols = -species) |> 
+  group_by(species) |> 
+  group_split()
+
+
+map(.x = Food_charactisation_list, .f = \(this_species_food){
+  
+  this_species <- this_species_food$species |> unique()
+  
+  this_species_food_df <- 
+    this_species_food |> 
+    relocate(prop, .before = "nutrient") |> 
+    mutate(nutrient = as.character(paste0(str_to_sentence(nutrient), "s"))) |> 
+    mutate(prop = as.double(prop)) |> 
+    select(-species)
+  
+  write.table(this_species_food_df, file = sprintf("data/%s/forcings/Food_characterization.csv", this_species), row.names = FALSE, col.names = FALSE, sep = ",")
+
+})
+
+
+
+```
+
+
+
