@@ -11,8 +11,126 @@ editor: visual
 
 library(tidyverse)
 library(here)
+library(janitor)
+
+
+
+```
+
+Isolate production data for species of interest
+
+```{r}
+
+
+aquaculture_raw <- read_csv(file.path(rdsi_dir, "raw_data/fao/FAO_fishstat_2020/global_aquaculture_production_1950_2020.csv"))
+
+
+(aquaculture_prod <- 
+  aquaculture_raw |> 
+  clean_names() |> 
+  select(c(1:7, starts_with("x"))) |> 
+  pivot_longer(names_to = "year", values_to = "production", cols= -c(1:7)) |> 
+  mutate(year = gsub(pattern="x", replacement = "", year)) |> 
+  filter(year %in% c(2015:2020)) |> 
+  group_by(asfis_species_name_2, asfis_species_name_3, environment_name, year) |> 
+  summarise(production = sum(production)) |> 
+    ungroup() |> 
+     filter(environment_name=="Marine" & 
+           !asfis_species_name_3 %in% c("Clams, cockles, arkshells", 
+                                        "Abalones, winkles, conchs",
+                                        "Mussels", 
+                                        "Oysters",
+                                        "Shrimps, prawns",
+                                        "Crabs, sea-spiders",
+                                         "Freshwater molluscs",
+                                        "Squids, cuttlefishes, octopuses",
+                                        "Pearls, mother-of-pearl, shells",
+                                        "Miscellaneous aquatic plants",
+                                        "Scallops, pectens"),
+         !grepl("seaweeds" , asfis_species_name_3),
+         !grepl("molluscs|cucumber|invertebrates", asfis_species_name_2)) |> 
+    filter(!asfis_species_name_2 %in% c("Marine fishes nei")) |> 
+     group_by(asfis_species_name_2) |> 
+     summarise(production_total = mean(production)) |> 
+  arrange(-production) |> 
+    mutate(cum_prop = cumsum(production)/sum(production),
+           prop = production/sum(production))
+)
+
+spp_names <- 
+  aquaculture_prod |> 
+  filter(asfis_species_name_2 %in% c("Atlantic salmon", 
+                                     "Rainbow trout", 
+                                     "European seabass", 
+                                     "Large yellow croaker",
+                                     "Gilthead seabream",
+                                     "Coho(=Silver) salmon",
+                                     "Japanese seabass", 
+                                     "Japanese amberjack", 
+                                     "Pompano", 
+                                     "Milkfish") | 
+           grepl(pattern = "rouper", asfis_species_name_2) & production > 1) |> 
+  pull(asfis_species_name_2)
+  
+
+
+
+
+(mariculture_spp_prod <- 
+    aquaculture_raw |> 
+    clean_names() |> 
+    select(c(1:7, starts_with("x"))) |> 
+    pivot_longer(names_to = "year", values_to = "production", cols= -c(1:7)) |> 
+    mutate(year = gsub(pattern="x", replacement = "", year)) |> 
+    filter(year %in% c(2015:2019)) |> 
+    filter(environment_name=="Marine" & 
+             !asfis_species_name_3 %in% c("Clams, cockles, arkshells", 
+                                          "Abalones, winkles, conchs",
+                                          "Mussels", 
+                                          "Oysters",
+                                          "Shrimps, prawns",
+                                          "Crabs, sea-spiders",
+                                          "Freshwater molluscs",
+                                          "Squids, cuttlefishes, octopuses",
+                                          "Pearls, mother-of-pearl, shells",
+                                          "Miscellaneous aquatic plants",
+                                          "Scallops, pectens"),
+           !grepl("seaweeds" , asfis_species_name_3),
+           !grepl("molluscs|cucumber|invertebrates", asfis_species_name_2)) |> 
+    filter(!asfis_species_name_2 %in% c("Marine fishes nei")) |> 
+    group_by(country_name, asfis_species_name_2, asfis_species_name_3, fao_major_fishing_area_name, year) |> 
+    summarise(production = sum(production)) |> 
+    ungroup() |> 
+    group_by(country_name, year) |> 
+    nest() |> 
+    mutate(national_production = map(data, ~(sum(.$production)))) |> 
+    unnest(cols = c(data, national_production)) |> 
+    ungroup() |> 
+    filter(asfis_species_name_2 %in% spp_names) |> 
+    mutate(prop_production = production/national_production) |> 
+  mutate(model_name = case_when(grepl("rouper", asfis_species_name_2) ~ "general_grouper", 
+                                asfis_species_name_2 %in% c("Coho(=Silver) salmon", "Rainbow trout") ~ "general_salmonid",
+                                TRUE ~ gsub(pattern = " ", replacement = "_", tolower(asfis_species_name_2)))) |> 
+  relocate(model_name, .before = asfis_species_name_2) |> 
+  group_by(country_name, model_name, asfis_species_name_2, asfis_species_name_3, fao_major_fishing_area_name) |> 
+    summarise(total_production = sum(production),
+              total_national_production = sum(national_production)) |> 
+    ungroup() |> 
+    mutate(prop_national_production = total_production/total_national_production) |> 
+    filter(prop_national_production>0)
+    ) 
+        
+        
+
+ 
+   mariculture_spp_prod$country_name |> unique() 
+    
 
 
 
 
 ```
+
+Pull in data from Clawson et al
+
+

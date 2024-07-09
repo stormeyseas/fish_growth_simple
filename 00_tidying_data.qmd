@@ -10,6 +10,7 @@ Setup
 
 library(tidyverse)
 library(here)
+library(terra)
 library(qs)
 
 
@@ -68,9 +69,11 @@ qsave(x = farm_locations, file = "data/_general_data/farm_locations.qs")
 
 ```
 
-Modify Feed characterisation
+Modify Feed characterisation and save to all species forcings
 
 ```{r}
+
+#import food characterisation data - this is calculated in an independent google drive document
 
 Food_charactisation_list <- 
   read_csv("data/_general_data/diets/protein_lipid_carb_summaries.csv") |> 
@@ -78,6 +81,9 @@ Food_charactisation_list <-
   pivot_longer(names_to = "nutrient", values_to = "prop", cols = -species) |> 
   group_by(species) |> 
   group_split()
+
+
+
 
 
 map(.x = Food_charactisation_list, .f = \(this_species_food){
@@ -99,5 +105,71 @@ map(.x = Food_charactisation_list, .f = \(this_species_food){
 
 ```
 
+Daily SST data from NASA - GHRSST Level 4 MUR 0.25deg Global Foundation Sea Surface Temperature Analysis 
+```{r}
+
+nasa_dir <- "/mnt/rdsi/raw_data/NASA/GHRSST_L4_MUR_0.25_SST/"
+
+
+#rename the NASA files 
+
+#SST_files <- list.files(file.path(rdsi_dir, "raw_data/NASA/GHRSST_L4_MUR_0.25_SST"), full.names = FALSE, pattern = ".nc")
+
+# map(SST_files, \(this_file){
+#   file.rename(from = file.path(nasa_dir, this_file), to = file.path(nasa_dir, sub('^(.{4})(.*)$', '\\1_\\2',  this_file)))
+# })
+
+
+SST_files <- list.files(file.path(rdsi_dir, "raw_data/NASA/GHRSST_L4_MUR_0.25_SST"), full.names = TRUE, pattern = ".nc")
+
+
+# this_file <- SST_files[[1]]
+# 
+# this_year=2013
+
+#initialise lists for each year
+
+years <- c(2010:2019)
+year_lists <- vector(mode ="list", length = length(years))
+
+# Add annual files to a list of files for each year
+
+for(y in 1:length(years)){
+  
+  this_year <- years[y]
+  
+  this_years_files <- SST_files[grep(paste0(this_year, "_"), SST_files)]
+  
+  this_years_files <- this_years_files[!grepl(paste0(this_year, "_0229"), this_years_files)]
+  
+  year_lists[[y]] <- this_years_files
+  
+}
+  
+
+# Extract the daily files for each year and rasterize in a stack
+
+days <- c(1:365)
+
+#this_day <- days[1]
+
+rast_list = vector(mode = "list", length = length(days))
+
+map(days, \(this_day){
+  
+  this_days_file_list <- sapply(year_lists, "[[", this_day)
+  
+  message("SST layer for Day ", this_day)
+  
+  this_day_stack <- rast(this_days_file_list, subds = "analysed_sst")
+  
+  this_day_mean_rast <- app(this_day_stack, "mean", na.rm=TRUE)-273.15
+  
+  writeRaster(this_day_mean_rast, filename = sprintf(here("data/_general_data/SST/sst_nasa_mur_L4_0.25_mean2010-2019_day_%s.tif"), this_day))
+  
+})
+  
+
+```
 
 
