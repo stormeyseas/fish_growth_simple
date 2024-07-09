@@ -12,6 +12,8 @@ editor: visual
 library(tidyverse)
 library(here)
 library(janitor)
+library(sf)
+library(qs)
 
 
 
@@ -98,7 +100,7 @@ spp_names <-
            !grepl("seaweeds" , asfis_species_name_3),
            !grepl("molluscs|cucumber|invertebrates", asfis_species_name_2)) |> 
     filter(!asfis_species_name_2 %in% c("Marine fishes nei")) |> 
-    group_by(country_name, asfis_species_name_2, asfis_species_name_3, fao_major_fishing_area_name, year) |> 
+    group_by(country_name, asfis_species_name_2, asfis_species_name_3, fao_major_fishing_area_name, fao_major_fishing_area_code, year) |> 
     summarise(production = sum(production)) |> 
     ungroup() |> 
     group_by(country_name, year) |> 
@@ -131,6 +133,47 @@ spp_names <-
 
 ```
 
-Pull in data from Clawson et al
+Pull in farm locations, add FAO Major fishing regions
+
+```{r}
+
+farms_sf <- qread(file = "data/_general_data/farm_locations.qs") |> 
+  st_as_sf(coords = c("X", "Y"), crs = "EPSG:4326") |> 
+  mutate(row_num = row_number()) |> 
+  group_by(row_num) |> 
+  group_split()
+
+FAO_shp <- read_sf("https://www.fao.org/fishery/geoserver/fifao/ows?service=WFS&request=GetFeature&version=1.0.0&typeName=fifao:FAO_AREAS_CWP_NOCOASTLINE&outputFormat=json") |> filter(F_LEVEL == "MAJOR") |> select(F_CODE)
+
+
+this_farm <- farms_sf[[1]]
+
+
+# define cores for parallel process
+
+cores <- parallel::detectCores()-2
+
+#  process set up
+
+future::plan(strategy = "multisession", workers = cores)
+
+#intersect farm points with FAO fishing code polygons
+
+farm_fao_intersect <- 
+  
+  furrr::future_map(.x = farms_sf, .f = \(this_farm){ # initiate parallel map function
+  
+  this_farm_fao_code <- st_intersection(this_farm, FAO_shp)
+  
+  return(this_farm_fao_code)
+  
+}) |> bind_rows() #combine to data frame
+
+
+
+
+
+```
+
 
 
