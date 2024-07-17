@@ -15,8 +15,9 @@ library(janitor)
 library(sf)
 library(qs)
 library(countrycode)
+library(terra)
 
-
+source("src/dir.R")
 
 ```
 
@@ -289,8 +290,7 @@ map(.x = farm_list, .y = \(this_country_region){
   this_country_region_production <- 
     mariculture_spp_prod |> 
     filter(iso3c == this_iso3c, fao_major_fishing_area_code == this_fao_code, farm_name == this_species_group)
-  
-  map()
+
   
   
   
@@ -298,6 +298,10 @@ map(.x = farm_list, .y = \(this_country_region){
   
   
 })
+
+
+
+
 
 ```
 
