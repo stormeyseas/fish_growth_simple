@@ -22,6 +22,39 @@ this_path <- sprintf(here("data/%s"), this_species)
 
 ```
 
+Temperature forcings for each farm
+```{r}
+
+farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area.qs") |> 
+  filter(model_name == this_species) |> 
+  select(-row_num) |> 
+  mutate(farm_id = row_number())
+
+
+days <- seq(1:365)
+
+
+map_df(.x = days, .f = \(day_number){
+  
+  
+  message("Getting temperature data for all sites - day ", day_number)
+  
+  sst_test <- rast(sprintf("data/_general_data/SST/SST_gf_rasters/sst_nasa_mur_L4_0.25_mean2010-2019_day_%s.tif", day_number))
+
+  extract(sst_test, farms) |> 
+    mutate(day = paste0("day_", day_number))
+  
+  
+})
+
+
+
+
+```
+
+
+
+
 Create and tidy inputs
 
 ```{r}

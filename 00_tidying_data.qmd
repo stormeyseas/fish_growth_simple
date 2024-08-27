@@ -65,7 +65,7 @@ Pull in mariculture locations data from Clawson et al 2022 and save the species 
 farm_locations <- read.csv(file.path(rdsi_dir, "raw_data/aquaculture-locations/all_marine_aquaculture_farms_sources_final.csv")) |> 
   filter(species_group %in% c("Salmonidae fish", "General marine fish"))
 
-qsave(x = farm_locations, file = "data/_general_data/farm_locations.qs") 
+qsave(x = farm_locations, file = "data/_general_data/farm_locations/locations.qs") 
 
 ```
 
@@ -105,7 +105,8 @@ map(.x = Food_charactisation_list, .f = \(this_species_food){
 
 ```
 
-Daily SST data from NASA - GHRSST Level 4 MUR 0.25deg Global Foundation Sea Surface Temperature Analysis 
+Daily SST data from NASA - GHRSST Level 4 MUR 0.25deg Global Foundation Sea Surface Temperature Analysis
+
 ```{r}
 
 nasa_dir <- "/mnt/rdsi/raw_data/NASA/GHRSST_L4_MUR_0.25_SST/"
@@ -151,7 +152,7 @@ for(y in 1:length(years)){
 
 days <- c(1:365)
 
-#this_day <- days[1]
+this_day <- days[1]
 
 rast_list = vector(mode = "list", length = length(days))
 
@@ -165,11 +166,34 @@ map(days, \(this_day){
   
   this_day_mean_rast <- app(this_day_stack, "mean", na.rm=TRUE)-273.15
   
-  writeRaster(this_day_mean_rast, filename = sprintf(here("data/_general_data/SST/sst_nasa_mur_L4_0.25_mean2010-2019_day_%s.tif"), this_day))
+  writeRaster(this_day_mean_rast, filename = sprintf(here("data/_general_data/SST/SST_rasters/sst_nasa_mur_L4_0.25_mean2010-2019_day_%s.tif"), this_day))
   
 })
   
 
+#now gapfill the saved rasters
+
+raw_SST_files <- list.files("data/_general_data/SST/SST_rasters/", full.names = TRUE)
+
+#test function
+#this_file <- raw_SST_files[[1]]
+
+map(.x = raw_SST_files, .f = \(this_file){
+  
+  saveName <-  basename(this_file)
+  
+  message("Gapfilling ", saveName)
+
+  
+  this_rast <- rast(this_file)
+  
+  this_gf_rast <- focal(this_rast, w=7, fun = "mean", na.policy = "only")
+  
+  writeRaster(this_gf_rast, filename = sprintf("data/_general_data/SST/SST_gf_rasters/%s", saveName))
+  
+})
+
+
+
+
 ```
-
-
