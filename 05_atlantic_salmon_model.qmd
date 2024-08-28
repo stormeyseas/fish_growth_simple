@@ -20,6 +20,8 @@ this_path <- sprintf(here("data/%s"), this_species)
 
 ```
 
+Prep temperature forcings for each farm site
+
 ```{r}
 
 farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area.qs") |> 
@@ -28,15 +30,20 @@ farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area.
   mutate(farm_id = row_number())
 
 
-days <- seq(1:365)
+production_cycle <- read_csv("data/_general_data/production_cycles/production_cycle.csv") |> 
+  filter(species == this_species) |> pull(days)
+
+
+days <- seq(1:production_cycle)
 
 
 temp_data <- map_dfc(.x = days, .f = \(day_number){
   
+  rast_day_number <- if_else(day_number <= 365, true = day_number, false = day_number-365)
   
-  message("Getting temperature data for all sites - day ", day_number)
+  message("Getting temperature data for all sites for ", this_species,  " - day ", day_number)
   
-  sst_test <- rast(sprintf("data/_general_data/SST/SST_gf_rasters/sst_nasa_mur_L4_0.25_mean2010-2019_day_%s.tif", day_number))
+  sst_test <- rast(sprintf("data/_general_data/SST/SST_gf_rasters/sst_nasa_mur_L4_0.25_mean2010-2019_day_%s.tif", rast_day_number))
 
   extract(sst_test, farms) |> 
     mutate(day = paste0("day_", day_number)) |> 
@@ -48,11 +55,47 @@ temp_data <- map_dfc(.x = days, .f = \(day_number){
   mutate(farm_id = row_number())
 
 
-farms |> 
-  left_join(temp_data, by = c("farm_id" = "farm_ID")) |> 
+farms_w_temp_df <- 
+  farms |> 
+  left_join(temp_data, by = c("farm_id" = "farm_id")) |> 
   pivot_longer(names_to = "day", values_to = "temp_c", cols = starts_with("day_"))
 
-names(temp_data)
+
+qsave(x = farms_w_temp_df, file = sprintf("data/_general_data/farm_locations/%s_locations_w_temps.qs", this_species))
+
+
+farm_list <- 
+  farms_w_temp_df |>
+  group_by(farm_id) |> 
+  group_split()
+
+#save temperature forcings per farm
+
+future::plan(strategy = "multisession", workers = parallel::detectCores()-2) #select multiple cores
+
+furrr::future_map(.x = farm_list, .f = \(this_farm){
+  
+  this_farm_id <- unique(this_farm$farm_id)
+  
+  temp_data_only <- 
+    this_farm |> 
+    select(day, temp_c) |> 
+    st_drop_geometry()
+  
+  
+  saveName <- sprintf("data/%s/forcings/Water_temperature_farmID_%s.csv", this_species, this_farm_id)
+  
+  if(!file.exists(saveName)){
+    
+     write.table(x = temp_data_only, file = saveName, col.names = FALSE, row.names = FALSE)
+  }
+    
+})
+
+
+
+
+
 ```
 
 Create and tidy inputs
