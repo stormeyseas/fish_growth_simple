@@ -63,10 +63,11 @@ create_species_folders  <-  \(this_species){
 # DATA LOADER FUNCTION
 # This function tidies, gapfills and standardises input data.
 
-data_loader <- \(this_path) {
+data_loader <- \(this_path, this_farm_id) {
+
   
   # Reads forcing files
-  Ttem = read.csv(file.path(this_path, "forcings/Water_temperature.csv"), sep = ",", header = FALSE)       # Reading the temperature time series (daily series) data
+  Ttem = read.csv(sprintf(file.path(this_path, "forcings/Water_temperature_%s.csv"), this_farm), header = FALSE)       # Reading the temperature time series (daily series) data
   DaF =  read.csv(file.path(this_path, "forcings/Feeding.csv"), sep = ",", header = FALSE)  # Reading the individual feeding dose time series (daily series) data
   
   # Reads integration extremes

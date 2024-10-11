@@ -69,6 +69,7 @@ farm_list <-
   group_by(farm_id) |> 
   group_split()
 
+
 #save temperature forcings per farm
 
 future::plan(strategy = "multisession", workers = parallel::detectCores()-2) #select multiple cores
@@ -85,9 +86,9 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
   
   saveName <- sprintf("data/%s/forcings/Water_temperature_farmID_%s.csv", this_species, this_farm_id)
   
-  if(!file.exists(saveName)){
+  if(file.exists(saveName)){
     
-     write.table(x = temp_data_only, file = saveName, col.names = FALSE, row.names = FALSE)
+     write.table(x = temp_data_only, file = saveName, col.names = FALSE, row.names = FALSE, sep = ",")
   }
     
 })
@@ -98,7 +99,7 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
 
 ```
 
-Create and tidy inputs
+For each farm run the pull in and tidy the input
 
 ```{r}
 
@@ -110,14 +111,8 @@ forcings <- data_loader(this_path)
 inputs <- preprocess(this_path = this_path, these_forcings = forcings)
 
 
-
-```
-
-### Population model
-
-```{r}
-
 model_output <- model(this_path = this_path, forcings = forcings, this_species = this_species)
 
 
 ```
+
