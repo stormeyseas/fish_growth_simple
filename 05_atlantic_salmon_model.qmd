@@ -8,6 +8,7 @@ Setup
 
 ```{r}
 library(tidyverse)
+library(qs)
 library(here)
 
 
@@ -20,6 +21,14 @@ this_path <- sprintf(here("data/%s"), this_species)
 
 ```
 
+Get stocking densities for salmon across nations
+
+```{r}
+
+```
+
+
+
 Prep temperature forcings for each farm site
 
 ```{r}
@@ -30,8 +39,12 @@ farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area.
   mutate(farm_id = row_number())
 
 
-production_cycle <- read_csv("data/_general_data/production_cycles/production_cycle.csv") |> 
-  filter(species == this_species) |> pull(days)
+#Typical stocking density could be back calculated from average tonnage
+
+farms$tonnes_per_farm |> unique() |> median()
+
+
+
 
 
 days <- seq(1:production_cycle)
@@ -86,7 +99,7 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
   
   saveName <- sprintf("data/%s/forcings/Water_temperature_farmID_%s.csv", this_species, this_farm_id)
   
-  if(file.exists(saveName)){
+  if(!file.exists(saveName)){
     
      write.table(x = temp_data_only, file = saveName, col.names = FALSE, row.names = FALSE, sep = ",")
   }
@@ -99,11 +112,14 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
 
 ```
 
-For each farm run the pull in and tidy the input
+
+Run model for each location under reference feed.
 
 ```{r}
 
 # pull in data for interpolation
+
+
 
 forcings <- data_loader(this_path)
 

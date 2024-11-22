@@ -151,7 +151,7 @@ farms_sf <- qread(file = "data/_general_data/farm_locations/locations.qs") |>
   group_split()
 
 
-FAO_shp <- read_sf("https://www.fao.org/fishery/geoserver/fifao/ows?service=WFS&request=GetFeature&version=1.0.0&typeName=fifao:FAO_AREAS_CWP_NOCOASTLINE&outputFormat=json") |> filter(F_LEVEL == "MAJOR") |> select(F_CODE)
+FAO_shp <- read_sf(file.path(rdsi_dir, "raw_data/fao/FAO_AREAS_CWP_NOCOASTLINE")) |> filter(F_LEVEL == "MAJOR") |> select(F_CODE)
 
 #test function
 #this_farm <- farms_sf[[1]]
@@ -232,7 +232,7 @@ mariculture_prod_all <-
 
 #Check that farm locations in mapped data are in the same FAO fishing regions as the production data
 
-fao_farm_intersect <- qread(here("data/_general_data/farm_locations/locations_w_fishing_areas.qs"))
+farm_fao_intersect <- qread(here("data/_general_data/farm_locations/locations_w_fishing_areas.qs"))
 
 
 farm_list <- 
@@ -242,7 +242,7 @@ farm_list <-
 
 #Test function
 
-this_country_region <- farm_list[[3]]
+this_country_region <- farm_list[[4]]
 
 
 (fao_area_code_check <- 
@@ -282,9 +282,7 @@ this_country_region <- farm_list[[3]]
 
 ```
 
-
 Assign species to individual farms
-
 
 ```{r}
 farm_list <- 
@@ -341,5 +339,15 @@ map_spp_to_locations_list <-
 map_spp_to_locations <- bind_rows(lapply(map_spp_to_locations_list, FUN = function(element) if(nrow(element) == 0) NULL else element)) #removes the NULL record returns
 
 qsave(x = map_spp_to_locations, file = here("data/_general_data/farm_locations/locations_w_species_fao_area.qs"))
+```
+
+
+Stocking densities from the tonnage per farm and harvest size.
+
+```{r}
+
+qread("data/_general_data/farm_locations/locations_w_species_fao_area.qs")
+
+
 ```
 

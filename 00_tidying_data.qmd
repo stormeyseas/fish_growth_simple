@@ -76,7 +76,7 @@ Modify Feed characterisation and save to all species forcings
 #import food characterisation data - this is calculated in an independent google drive document
 
 Food_charactisation_list <- 
-  read_csv("data/_general_data/diets/protein_lipid_carb_summaries.csv") |> 
+  read_csv("data/_general_data/diets/protein_lipid_carb_summaries_diet.csv") |> 
   select(-c(5)) |> 
   pivot_longer(names_to = "nutrient", values_to = "prop", cols = -species) |> 
   group_by(species) |> 
@@ -199,25 +199,17 @@ map(.x = raw_SST_files, .f = \(this_file){
 ```
 
 
-Distribute feed summaries into each species folder
+Make some stocking density assumptions based on farm tonnage
 
 ```{r}
 
-feed_summaries <- 
-  read.csv("data/_general_data/diets/protein_lipid_carb_summaries.csv") |> 
-  select(-X) |> 
-  pivot_longer(values_to = "prop", names_to = "nutrient", cols = -c(species)) |> 
-  relocate(prop, .before = nutrient) |> 
-  mutate(nutrient = paste0(nutrient, "s"))
-  group_by(species) |> 
-  group_split()
-
-
+farm_info <- qread("data/_general_data/farm_locations/locations.qs")
 
 
 
 
 
 ```
+
 
 
