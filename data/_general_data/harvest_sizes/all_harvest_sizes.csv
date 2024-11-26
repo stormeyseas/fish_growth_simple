@@ -1,0 +1,11 @@
+species,harvest_size_g,harvest_size_t
+atlantic_salmon,5000,0.005
+general_salmonid,2500,0.0025
+european_seabass,450,0.00045
+gilthead_seabream,350,0.00035
+large_yellow_croaker,400,0.0004
+japanese_amberjack,6000,0.006
+japanese_seabass,500,0.0005
+general_grouper,2000,0.002
+pompano,350,0.00035
+milkfish,500,0.0005

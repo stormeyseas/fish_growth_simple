@@ -346,8 +346,24 @@ Stocking densities from the tonnage per farm and harvest size.
 
 ```{r}
 
-qread("data/_general_data/farm_locations/locations_w_species_fao_area.qs")
+farms_w_species <- qread("data/_general_data/farm_locations/locations_w_species_fao_area.qs") 
 
+harvest_sizes <- read_csv("data/_general_data/harvest_sizes/all_harvest_sizes.csv") |> select(-harvest_size_g)
+
+production_cycle <- read_csv("data/_general_data/production_cycles/production_cycle.csv") |> select(species, days)
+
+mortality_rates <- read_csv("data/_general_data/mortality_rates/all_mortality_rates.csv")
+
+farms_w_stocking <- 
+  farms_w_species |> 
+  left_join(harvest_sizes, by = c("model_name" = "species")) |> 
+  left_join(production_cycle, by = c("model_name" = "species")) |> 
+  left_join(mortality_rates, by = c("model_name" = "species")) |> 
+  mutate(harvest_n = tonnes_per_farm/harvest_size_t) |> 
+  mutate(stocking_n = harvest_n * exp(daily_mort_rate*days))
+  
+
+qsave(x = farms_w_stocking, file =  "data/_general_data/farm_locations/locations_w_species_fao_area_stocking.qs")
 
 ```
 

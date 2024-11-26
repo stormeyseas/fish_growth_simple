@@ -21,30 +21,18 @@ this_path <- sprintf(here("data/%s"), this_species)
 
 ```
 
-Get stocking densities for salmon across nations
-
-```{r}
-
-```
-
-
 
 Prep temperature forcings for each farm site
 
 ```{r}
 
-farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area.qs") |> 
+production_cycle <- read_csv("data/_general_data/production_cycles/production_cycle.csv") |> filter(species == this_species) |> pull(days)
+
+
+farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area_stocking.qs") |> 
   filter(model_name == this_species) |> 
   select(-row_num) |> 
   mutate(farm_id = row_number())
-
-
-#Typical stocking density could be back calculated from average tonnage
-
-farms$tonnes_per_farm |> unique() |> median()
-
-
-
 
 
 days <- seq(1:production_cycle)
@@ -73,6 +61,8 @@ farms_w_temp_df <-
   left_join(temp_data, by = c("farm_id" = "farm_id")) |> 
   pivot_longer(names_to = "day", values_to = "temp_c", cols = starts_with("day_"))
 
+
+head(farms_w_temp_df)
 
 qsave(x = farms_w_temp_df, file = sprintf("data/_general_data/farm_locations/%s_locations_w_temps.qs", this_species))
 
@@ -121,7 +111,7 @@ Run model for each location under reference feed.
 
 
 
-forcings <- data_loader(this_path)
+forcings <- data_loader(this_path, this_farm)
 
 
 inputs <- preprocess(this_path = this_path, these_forcings = forcings)
