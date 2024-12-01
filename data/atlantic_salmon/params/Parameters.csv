@@ -1,0 +1,38 @@
+Used in script,Description,Value,Unit,Reference
+ingmax,Maximum ingestion rate,See file 'Population.csv',,
+alpha,Feeding catabolism coefficient,0.04,-,"Broekhuizen et al. 1994 Modelling compensatory growth, Functional Ecology 8, 770–782.– Salvelinus alpinus, Oncorhynchus mykiss (temps: 8–13°C)"
+betaprot,Assimilation coefficient for protein,0.89,-,See feed_profiles_composition sheet
+betalip,Assimilation coefficient for lipid,0.96,-,See feed_profiles_composition sheet
+betacarb,Assimilation coefficient for carbohydrate,0.7,-,See feed_profiles_composition sheet
+epsprot,Energy content of protein,23600,J/gprot,"Baldan et al. 2018 An R package for simulating growth and organic wastage in aquaculture farms in response to environmental conditions and husbandry practices, PLoS ONE 13, e0195732."
+epslip,Energy content of lipid,36200,J/glip,"Baldan et al. 2018 An R package for simulating growth and organic wastage in aquaculture farms in response to environmental conditions and husbandry practices, PLoS ONE 13, e0195732."
+epscarb,Energy content of carbohydrate,17200,J/gcarb,"Baldan et al. 2018 An R package for simulating growth and organic wastage in aquaculture farms in response to environmental conditions and husbandry practices, PLoS ONE 13, e0195732."
+epsO2,Energy consumed by the respiration of 1g of oxygen,13400,J/gO2,"Elliott, J.M., Davison, W. Energy equivalents of oxygen consumption in animal energetics. Oecologia 19, 195–201 (1975). https://doi.org/10.1007/BF00345305"
+pk,Temperature coefficient for the fasting catabolism,0.05,1/d,"Macnaughton et al. 2019 Using meta-analysis to derive a respiration model for Atlantic salmon (Salmo salar) to assess bioenergetics requirements of juveniles in two Canadian rivers, Can. J. Fish. Aquat. Sci. 76, 2225–2234."
+k0,Fasting catabolism at 0∞C,0.003,1/∞C,"Macnaughton et al. 2019 Using meta-analysis to derive a respiration model for Atlantic salmon (Salmo salar) to assess bioenergetics requirements of juveniles in two Canadian rivers, Can. J. Fish. Aquat. Sci. 76, 2225–2234."
+m,Weight exponent for the anabolism,0.75,-,"Broekhuizen et al. 1994 Modelling compensatory growth, Functional Ecology 8, 770–782.– Salvelinus alpinus, Oncorhynchus mykiss (temps: 8–13°C)"
+n,Weight exponent for the catabolism,1,-,"Baldan et al. 2018 An R package for simulating growth and organic wastage in aquaculture farms in response to environmental conditions and husbandry practices, PLoS ONE 13, e0195732."
+betac,Shape coefficient for the H(Tw) function,0.3234,-,"Jonsson, Forseth, Jensen & Næsje 2001 Thermal performance of juvenile Atlantic salmon, Salmo salar L., Functional Ecology 15, 701-711.
+– fish size range: 2.25±0.49 – 11.5±5.29g 
+– temperature ranges: 5–24°C
+ – coefficent for mean daily energy intake of the moderately fast growing group, 0.4398 (mean fast group), 0.2214 (mean slow group)"
+Tma,Maximum lethal temperature ,26,∞C,"Poletto et al. 2017 Unusual aerobic performance at high temperatures in juvenile Chinook salmon, Oncorhynchus tshawytscha, Conservation Physiology 5, cow067, https://dx.doi.org/10.1093%2Fconphys%2Fcow067, – juvenile Chinook salmon (19.8 ± 0.02g, acclimation temp: 15°C, 19°C)"
+Toa,Optimal temperature ,18,∞C,"Jonsson, Forseth, Jensen & Næsje 2001 Thermal performance of juvenile Atlantic salmon, Salmo salar L., Functional Ecology 15, 701-711.
+– fish size range: 2.25±0.49 – 11.5±5.29g 
+– temperature ranges: 5–24°C
+alt value: 14°C (Handeland et al. 2008 The effect of temperature and fish size on growth, feed intake, food conversion efficiency and stomach evacuation rate of Atlantic salmon post-smolts, Aquaculture 283, 36–42.
+– Salmo salar (initial size: 77.0 ± 14.6g, temps: 6, 10, 14, 18°C)"
+Taa,Lowest feeding temperature ,6,∞C,"Jonsson, Forseth, Jensen & Næsje 2001 Thermal performance of juvenile Atlantic salmon, Salmo salar L., Functional Ecology 15, 701-711.
+– fish size range: 2.25±0.49 – 11.5±5.29g 
+– temperature ranges: 5–24°C"
+omega,Oxygen consumption ñ weight loss ratio,0.6542,gO2/g,calibrated value from Baldan et al. 2018
+a,Energy content of fish parameter,2669,J/gfish,"Tien et al. 2016 Development of a nutritional model to define the energy and nutrient requirements of cobia, Rachycentron canadum, Aquaculture 463, 193-200.
+alt value: 17.02350 (nls model fitted to female Atlantic salmon data extracted and transformed from Jonsson & Jonsson (2003) doi: 10.1139/F03-042)"
+k,Weight exponent for energy content,0.1715,-,"Tien et al. 2016 Development of a nutritional model to define the energy and nutrient requirements of cobia, Rachycentron canadum, Aquaculture 463, 193-200.
+alt value: 1.65175 (nls model fitted to female Atlantic salmon data extracted and transformed from Jonsson & Jonsson (2003) doi: 10.1139/F03-042)"
+eff,Food ingestion efficiency,0.95,-,"Uglem I,  Toledo-Guedes K,  Sanchez-Jerez P,  Ulvan EM,  Evensen T,  Sæther BS.  Does waste feed from salmon farming affect the quality of saithe (Pollachius virens L.) attracted to fish farms?. Aquac Res.  2020; 51: 1720–1730. https://doi.org/10.1111/are.14519
+– range: 95-97% ingestion efficiency"
+ti,Integration start,day_1,-,
+tf,Integration end,day_730,-,
+IC,Initial condition on weight,See file 'Population.csv',,
+CS,Commercial size,4000,g,https://www.fao.org/fishery/affris/species-profiles/atlantic-salmon/growth/en/

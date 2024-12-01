@@ -8,9 +8,10 @@ Setup
 
 ```{r}
 library(tidyverse)
+library(terra)
 library(qs)
 library(here)
-
+library(sf)
 
 #functions
 source(here("src/model_functions.R"))
@@ -26,7 +27,7 @@ Prep temperature forcings for each farm site
 
 ```{r}
 
-production_cycle <- read_csv("data/_general_data/production_cycles/production_cycle.csv") |> filter(species == this_species) |> pull(days)
+production_cycle <- read_csv("data/_general_data/production_cycles/production_cycle.csv") |> filter(species == this_species) |> rename(production_cycle_length = days)|> pull(production_cycle_length)
 
 
 farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area_stocking.qs") |> 
@@ -111,7 +112,7 @@ Run model for each location under reference feed.
 
 
 
-forcings <- data_loader(this_path, this_farm)
+forcings <- data_loader(this_path, this_species, this_farm)
 
 
 inputs <- preprocess(this_path = this_path, these_forcings = forcings)
