@@ -63,64 +63,30 @@ create_species_folders  <-  \(this_species){
 # DATA LOADER FUNCTION
 # This function tidies, gapfills and standardises input data.
 
-data_loader <- \(this_path, this_farm_id) {
+ data_loader <- \(this_path, this_farm_id) {
+ 
 
-  
   # Reads forcing files
-  Ttem = read.csv(sprintf(file.path(this_path, "forcings/Water_temperature_%s.csv"), this_farm), header = FALSE)       # Reading the temperature time series (daily series) data
-  DaF =  read.csv(file.path(this_path, "forcings/Feeding.csv"), sep = ",", header = FALSE)  # Reading the individual feeding dose time series (daily series) data
-  
-  # Reads integration extremes
-  Param_matrix= read.csv(file.path(this_path,"params/Parameters.csv"), sep = ",")   # Reading the matrix containing parameters and their description
-  
+  Ttem = read.csv(sprintf(file.path(this_path, "forcings/Water_temperature_%s.csv"), this_farm_id), header = FALSE)       # Reading the temperature time series (daily series) data
+  #DaF =  read.csv(file.path(this_path, "forcings/Feeding.csv"), sep = ",", header = FALSE)  # Reading the individual feeding dose time series (daily series) data
+
+
   #Extracts vectors from the forcing files
   timeT=as.matrix(Ttem[,1])                     # Vector of the times of Temperature measurements
   Temperature=as.double(as.matrix(Ttem[,2]))    # Vector of  water temperature time series (daily series)
-  timeG=as.matrix(DaF[,1])                      # Vector of the times of feeding dose
-  G=as.double(as.matrix(DaF[,2]))               # Vector of the individual feeding dose time series (daily series)
-  Dates=Param_matrix[22:23,3]                   # Vector containing the starting and ending date of the simulation
-  
-  # Times needed to perform interpolation
-  t0=min(as.numeric(as.Date(timeT[1], "%d/%m/%Y")), as.numeric(as.Date(timeG[1], "%d/%m/%Y")))
-  ti=as.numeric(as.Date(Dates[1], "%d/%m/%Y"))-t0   # Start of integration [day]
-  tf=as.numeric(as.Date(Dates[2], "%d/%m/%Y"))-t0   # End of integration [day]
-  
-  # Prepare t data for Temperature and Feeding interpolation
-  timeTseries=as.numeric(as.Date(timeT, "%d/%m/%Y"))-t0     # Days at which temperature measurements are available
-  timeGseries=as.numeric(as.Date(timeG, "%d/%m/%Y"))-t0     # Days at which food measurements are available
-  
-  # Interpolation of Temperature and Feeding forcings
-  Ttem=as.vector(matrix(0,nrow=ti-1))              # Initialize vector Tint
-  Gtem=as.vector(matrix(0,nrow=ti-1))              # Initialize vector Gint
-  i=ti:tf+1                                        # Interpolation base points
-  Ttem2=approx(timeTseries,Temperature,xout=i)     # T interpolation according to base points
-  Gtem2=approx(timeGseries,G,xout=i)               # G interpolation according to base points
-  Tint=c(Ttem, Ttem2$y)                            # Interpolated T values starting at t0
-  Gint=c(Gtem, Gtem2$y)                            # Interpolated G values starting at t0
-  
-  # Prepare dates vector
-  daysT <- seq(as.Date(timeT[1], format = "%d/%m/%Y"), by = "days", length = length(Tint))
-  daysG <- seq(as.Date(timeG[1], format = "%d/%m/%Y"), by = "days", length = length(Tint))
-  
-  # Check if forcings are Ok with integration extremes
-  if ((ti<(as.numeric(as.Date(timeT[1], "%d/%m/%Y"))-t0))|(ti<(as.numeric(as.Date(timeG[1], "%d/%m/%Y"))-t0))) {
-    cat("ERROR: forcings are beginning after the specified integration start\n")
-    cat("Impossible to proceed with interpolation\n")
-  }
-  
-  if ((ti>(as.numeric(as.Date(timeT[length(timeT)], "%d/%m/%Y"))-t0))|(ti>(as.numeric(as.Date(timeG[length(timeG)], "%d/%m/%Y"))-t0))) {
-    cat("ERROR: forcing are ending before the specified integration end\n")
-    cat("Impossible to proceed with interpolation\n")
-  }
-  
-  forcings=list(daysT,Tint,daysG,Gint)
-  
+  # timeF=as.matrix(DaF[,1])                      # Vector of the times of feeding dose
+  # Feed=as.double(as.matrix(DaF[,2]))               # Vector of the individual feeding dose time series (daily series)
+  #Dates=Param_matrix[22:23,3]                   # Vector containing the starting and ending day of the simulation
+
+
+  forcings=list(timeT,Temperature)
+
   return(forcings)
 }
 
 
 # Function that solves the population dynamics equations including discontinuities
-Pop_fun <- \(Nseed, mort, manag, times) {
+Pop_fun <- \(Nseed, mort,times) {
   
   # Integration times
   ti=times[1]
@@ -136,13 +102,16 @@ Pop_fun <- \(Nseed, mort, manag, times) {
     
     dN[t]=-mort*N[t]             # individuals increment
     N[t+1]=N[t]+dN[t]*timestep   # Individuals at time t+1
+
     
-    for (i in 1:length(manag[,1])) {  # For cycle that adjusts N according with management strategies
-      if (t==manag[i,1]) {              # if statement to check if it is the time to adjust N
-        N[t+1]=N[t]+manag[i,2]
+   #Taking out the management alterations for now
         
-      } # close if
-    } # close for
+    # for (i in 1:length(manag[,1])) {  # For cycle that adjusts N according with management strategies
+    #   if (t==manag[i,1]) {              # if statement to check if it is the time to adjust N
+    #     N[t+1]=N[t]+manag[i,2]
+    #     
+    #   } # close if
+    # } # close for
   } # close for
   
   output=N
@@ -154,20 +123,20 @@ Pop_fun <- \(Nseed, mort, manag, times) {
 
 #PREPROCESSOR FUNCTION - pulls in input data and gap fills where necessary to ensure consistent and complete time series
 
-preprocess <- \(this_path, these_forcings){
+preprocess <- \(this_path, these_forcings, this_feed, this_stocking_N){
 
   cat("Data preprocessing")
   
   # Extracts forcings values from the list
   timeT <- these_forcings[[1]]
-  Tint <- these_forcings[[2]]
-  timeG <- these_forcings[[3]]
-  Gint <- these_forcings[[4]]
+  Temperature <- these_forcings[[2]]
+  # timeF <- these_forcings[[3]]
+  # Feed <- these_forcings[[4]]
   
   
   # Read forcings and parameters from .csv files
   Param_matrix <- read.csv(file.path(this_path,"params/Parameters.csv"), sep = ",")           # Reading the matrix containing parameters and their description
-  Food <- read.csv(file.path(this_path, "forcings/Food_characterization.csv"), sep = ",", header = FALSE)    # Reading the food composition (Proteins, Lipids, Carbohydrates) data
+  Food <- read.csv(sprintf(file.path(this_path, "forcings/Food_characterization_%s.csv"), this_feed), sep = ",", header = FALSE)    # Reading the food composition (Proteins, Lipids, Carbohydrates) data
   
   # Extract parameters and forcing values from parameters matrix and convert to type 'double' the vector contents
   Param <-  as.matrix(Param_matrix[1:21,3])           # Vector containing all parameters
@@ -178,22 +147,26 @@ preprocess <- \(this_path, these_forcings){
   Food <- as.double(as.matrix(Food[,1]))              # Food composition (Proteins, Lipids, Carbohydrates) data
   
   # Prepare data for ODE solution
-  t0 <- min(as.numeric(as.Date(timeT[1], "%d/%m/%Y")), as.numeric(as.Date(timeG[1], "%d/%m/%Y")), as.numeric(as.Date(Dates[1], "%d/%m/%Y"))) #  Minimum starting date for forcings and observations
+  #t0 <- min(as.numeric(as.Date(timeT[1], "%d/%m/%Y")), as.numeric(as.Date(timeG[1], "%d/%m/%Y")), as.numeric(as.Date(Dates[1], "%d/%m/%Y"))) #  Minimum starting date for forcings and observations
   timestep <- 1                                        # Time step for integration [day]
-  ti <- as.numeric(as.Date(Dates[1], "%d/%m/%Y"))-t0   # Start of integration [day]
-  tf <- as.numeric(as.Date(Dates[2], "%d/%m/%Y"))-t0   # End of integration [day]
+  ti <- as.numeric(gsub("day_", "", Dates[1]))   # Start of integration [day]
+  tf <- as.numeric(gsub("day_", "", Dates[2]))    # End of integration [day]
   #weight=as.vector(matrix(0,nrow=ti))               # Initialize vector weight
   #weight[ti]=IC                                     # Weight initial value [g]
-  times <- cbind(ti, tf, timestep,t0)                    # Vector with integration data
+  times <- cbind(ti, tf, timestep)                    # Vector with integration data
   
   # Food composition vector
   Pcont <- Food[1]       # [-] Percentage of proteins in the food
   Lcont <- Food[2]       # [-] Percentage of lipids in the food
   Ccont <- Food[3]       # [-] Percentage of carbohydrates in the food
   
-  # Read files with population parameters and management strategies
-  Pop_matrix <- read.csv(file.path(this_path,"params/Population.csv"), sep = ",")   # Reading the matrix containing population parameters and their description
-  Management <- read.csv(file.path(this_path,"management/Management.csv"), sep = ",")   # Reading the matrix containing seeding and harvesting management
+  # Read files with population parameters and management strategies (not used here)
+
+Pop_matrix <- read.csv(file.path(this_path,"params/Population.csv"), sep = ",") |> 
+  mutate(Value = case_when(Quantity == "Nseed" ~ this_stocking_N,
+                           TRUE ~ Value)) # Reading the matrix containing population parameters and their description
+  
+  #Management <- read.csv(file.path(this_path,"management/Management.csv"), sep = ",")   # Reading the matrix containing seeding and harvesting management
   
   # Extract population parameters
   meanW <- as.double(as.matrix(Pop_matrix[1,3]))      # [g] Dry weight average
@@ -202,27 +175,30 @@ preprocess <- \(this_path, these_forcings){
   Wlb <- as.double(as.matrix(Pop_matrix[3,3]))        # [g] Dry weight lower bound
   meanImax <- as.double(as.matrix(Pop_matrix[4,3]))   # [l/d gDW] Clearance rate average
   deltaImax <- as.double(as.matrix(Pop_matrix[5,3]))  # [l/d gDW] Clearance rate standard deviation
-  Nseed <- as.double(as.matrix(Pop_matrix[6,3]))      # [-] number of seeded individuals
+  Nseed <-as.double(as.matrix(Pop_matrix[6,3]))      # [-] number of seeded individuals
   mortmyt <- as.double(as.matrix(Pop_matrix[7,3]))    # [1/d] natural mortality rate
   nruns <- as.double(as.matrix(Pop_matrix[8,3]))      # [-] number of runs for population simulation
   
-  # Prepare management values
-  manag <- as.matrix(matrix(0,nrow=length(Management[,1]),ncol=2))
+
+  #Not using realistic management values at present
   
-  for (i in 1:length(Management[,1])) {
-    manag[i,1]=as.numeric(as.Date(Management[i,1], "%d/%m/%Y"))-t0
-    if ((Management[i,2])=="h") {
-      manag[i,2]=-as.numeric(Management[i,3])
-    } else {
-      manag[i,2]=as.numeric(Management[i,3])
-    }
-  }
-  
-  
+    # # Prepare management values
+  # manag <- as.matrix(matrix(0,nrow=length(Management[,1]),ncol=2))
+  # 
+  # for (i in 1:length(Management[,1])) {
+  #   manag[i,1]=as.numeric(as.Date(Management[i,1], "%d/%m/%Y"))-t0
+  #   if ((Management[i,2])=="h") {
+  #     manag[i,2]=-as.numeric(Management[i,3])
+  #   } else {
+  #     manag[i,2]=as.numeric(Management[i,3])
+  #   }
+  # }
+  # 
+  # 
   
   # Population differential equation solution - uses first order Runge Kutta integration (Eulers method) to estimate population number at subsequent time step given an initial slope (N*mortality)
   
-  N <- Pop_fun(Nseed, mortmyt, manag, times)
+  N <- Pop_fun(Nseed, mortmyt, times)
   
   
   # Print to screen inserted parameters
@@ -255,23 +231,23 @@ preprocess <- \(this_path, these_forcings){
   }
   
   cat(" \n")
-  cat("The population is initially composed by ", toString(Pop_matrix[6,3]), " Individuals\n")
+  cat("The population is initially composed by ", unique(this_stocking_N), " Individuals\n")
   cat(" \n")
   cat("The mortality rate is:", toString(Pop_matrix[7,3]),'1/d\n' )
   
   
-  
+  #TAKING OUT MANAGEMENT FOR NOW
   # Print to screen management actions
-  cat(" \n")
-  cat('The population is managed according with following list (h:harvesting s:seeding):\n');
-  cat(" \n")
-  for (i in 1:length(Management[,1])){
-    cat(paste0(toString(Management[i,1])," ", toString(Management[i,2]), " " ,toString(Management[i,3])),"individuals\n")
-  }
-  
-  cat(" \n")
-  cat("The individual model will be executed ", toString(nruns), " times in order to simulate a population\n")
-  cat(" \n")
+  # cat(" \n")
+  # cat('The population is managed according with following list (h:harvesting s:seeding):\n');
+  # cat(" \n")
+  # for (i in 1:length(Management[,1])){
+  #   cat(paste0(toString(Management[i,1])," ", toString(Management[i,2]), " " ,toString(Management[i,3])),"individuals\n")
+  # }
+  # 
+  # cat(" \n")
+  # cat("The individual model will be executed ", toString(nruns), " times in order to simulate a population\n")
+  # cat(" \n")
   
   
   
@@ -279,52 +255,50 @@ preprocess <- \(this_path, these_forcings){
   
   cat(" \n")
   cat("Forcings are represented in graphs available at the following folder:\n")
-  cat(file.path(this_path,"/figures\n"))
-  
+  cat(file.path(this_path,"/figures/inputs\n"))
   
   
   
   # Plot Temperature forcing
-  Tintsave=Tint[(ti+1):tf]
-  filepath <- file.path(this_path,"/figures/inputs/Water_temperature.jpeg")
-  jpeg(filepath,800,600)
-  days <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), by = "days", length = tf-ti)
-  plot(days, Tintsave, ylab="Water temperature (Celsius degrees)", xlab="",xaxt = "n",type="l",cex.lab=1.4)
-  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
-  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
-  dev.off()
+  
+  ggplot(data = data.frame(Day = seq(ti:tf), Temperature = Temperature))+
+    aes(x = Day, y = Temperature)+
+    geom_line()+
+    labs(y = bquote(Temperature~degree~C), title = paste(as_label(this_species), as_label(this_farm_id)))+
+    theme_bw()+
+    theme(title = element_text(face="bold", size=8))
+  
+  ggsave(filename = file.path(this_path, sprintf("figures/inputs/Water_temperature_%s.jpeg", this_farm_id)), dpi=150, width = 12, height = 8, units="cm")
   
   
+  # Masking feed supply for now
+  # # Plot feeding rate forcing
+  # Gintsave=Gint[(ti+1):tf]
+  # filepath <- file.path(this_path,"/figures/inputs/Feeding.jpeg")
+  # jpeg(filepath,800,600)
+  # days <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), by = "days", length = tf-ti)
+  # plot(days, Gintsave, ylab="Feed (g/d)", xlab="", xaxt = "n",type="l",cex.lab=1.4)
+  # labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  # axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  # dev.off()
+  
+
+#Plot population change
+ggplot(data = data.frame(Day = seq(ti:tf), Stocked_fish = N[ti:tf]))+
+    aes(x = Day, y = Stocked_fish)+
+    geom_line()+
+    labs(y = "Number of individuals", title = paste(as_label(this_species), as_label(this_farm_id)))+
+    theme_bw()+
+    theme(title = element_text(face="bold", size=8))
   
   
-  # Plot feeding rate forcing
-  Gintsave=Gint[(ti+1):tf]
-  filepath <- file.path(this_path,"/figures/inputs/Feeding.jpeg")
-  jpeg(filepath,800,600)
-  days <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), by = "days", length = tf-ti)
-  plot(days, Gintsave, ylab="Feed (g/d)", xlab="", xaxt = "n",type="l",cex.lab=1.4)
-  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
-  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
-  dev.off()
+ggsave(filename = file.path(this_path, sprintf("figures/inputs/Population_%s.jpeg", this_farm_id)), dpi=150, width = 12, height = 8, units="cm")
   
+
   
-  
-  
-  # plot population dynamics
-  Nsave=N[(ti+1):tf]
-  filepath <-  file.path(this_path,"/figures/inputs/Population.jpeg")
-  jpeg(filepath,800,600)
-  days <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), by = "days", length = tf-ti)
-  plot(days, Nsave, ylab="Individuals", xlab="", xaxt = "n",type="l",cex.lab=1.4)
-  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
-  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
-  dev.off()
-  
-  output <- list(Param, Tint, Gint, Food, IC, times, Dates, N,CS)
+  output <- list(Param, Temperature, Food, IC, times, Dates, N,CS)
   return(output)
 }
-
-
 
 
 
