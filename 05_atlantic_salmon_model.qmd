@@ -20,6 +20,7 @@ source(here("src/model_functions.R"))
 this_species <- "atlantic_salmon"
 this_path <- sprintf(here("data/%s"), this_species)
 
+
 ```
 
 
@@ -129,7 +130,19 @@ map(.x = farm_list, .f = \(this_farm){
   
   forcings <- data_loader(this_path =  this_path, this_farm_id = this_farm_id)
   
-  inputs <- preprocess(this_path = this_path, these_forcings = forcings, this_feed = "reference", this_stocking_N = this_stocking_N)
+  out_pre <- preprocess(this_path = this_path, these_forcings = forcings, this_feed = "reference", this_stocking_N = this_stocking_N)
+  
+  Param=out_pre[[1]]
+  Tint=out_pre[[2]]
+  #Gint=out_pre[[3]]
+  Food=out_pre[[3]]
+  IC=out_pre[[4]]
+  times=out_pre[[5]]
+  Dates=out_pre[[6]]
+  N=out_pre[[7]]
+  CS=out_pre[[8]]
+  
+  out_RK_solver <- loop(Param, Tint, Food, IC, times, N, this_path = this_path)
   
   
 })
@@ -141,9 +154,14 @@ map(.x = farm_list, .f = \(this_farm){
 
 
 
-model_output <- model(this_path = this_path, forcings = forcings, this_species = this_species)
+model_output <- model(this_path = this_path, forcings = inputs, this_species = this_species)
+
+forcings
 
 Pop_matrix
+
+
+
 
 ```
 

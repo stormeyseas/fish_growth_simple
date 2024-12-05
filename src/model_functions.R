@@ -171,7 +171,7 @@ Pop_matrix <- read.csv(file.path(this_path,"params/Population.csv"), sep = ",") 
   # Extract population parameters
   meanW <- as.double(as.matrix(Pop_matrix[1,3]))      # [g] Dry weight average
   deltaW <- as.double(as.matrix(Pop_matrix[2,3]))     # [g] Dry weight standard deviation
-  IC<-deltaW
+  IC<- deltaW
   Wlb <- as.double(as.matrix(Pop_matrix[3,3]))        # [g] Dry weight lower bound
   meanImax <- as.double(as.matrix(Pop_matrix[4,3]))   # [l/d gDW] Clearance rate average
   deltaImax <- as.double(as.matrix(Pop_matrix[5,3]))  # [l/d gDW] Clearance rate standard deviation
@@ -307,7 +307,7 @@ ggsave(filename = file.path(this_path, sprintf("figures/inputs/Population_%s.jpe
 # MODEL EQUATIONS  - calculates the growth and outputs for the bioenergetic model
 
 
-equations <- \(Param, N, Temp, G, Food, weight){
+equations <- \(Param, N, Temp, Food, weight){
   
   # Parameters definition
   # Parameters definition
@@ -325,13 +325,15 @@ equations <- \(Param, N, Temp, G, Food, weight){
   m=Param[12]            # [-] Weight exponent for the anabolism
   n=Param[13]            # [-] Weight exponent for the catabolism
   betac=Param[14]        # [-]  Shape coefficient for the H(Tw) function
-  Tma=Param[15]          # [Celsius degree] Maximum lethal temperature for Dicentrarchus labrax
-  Toa=Param[16]          # [Celsius degree] Optimal temperature for Dicentrarchus labrax
-  Taa=Param[17]          # [Celsius degree] Lowest feeding temperature for Dicentrarchus labrax
+  Tma=Param[15]          # [Celsius degree] Maximum lethal temperature 
+  Toa=Param[16]          # [Celsius degree] Optimal temperature 
+  Taa=Param[17]          # [Celsius degree] Lowest feeding temperature
   omega=Param[18]        # [gO2/g] Oxygen consumption - weight loss ratio
   a=Param[19]            # [J/gtissue] Energy content of fish tissue
   k=Param[20]            # [-] Weight exponent for energy content
   eff=Param[21]          # [-] Food ingestion efficiency
+  
+  
   
   # Food composition definition
   Pcont=Food[1]       # [-] Percentage of proteins in the food
@@ -341,6 +343,8 @@ equations <- \(Param, N, Temp, G, Food, weight){
   
   # EQUATIONS
   
+  #G = weight*ingmax #total feed provided
+  
   # Forcing temperature
   fgT=((Tma-Temp)/(Tma-Toa))^(betac*(Tma-Toa))*exp(betac*(Temp-Toa)) # Optimum Temperature dependance for ingestion [-]
   frT= exp(pk*Temp)                                                  # Exponential Temperature dependance for catabolism [-]
@@ -349,7 +353,7 @@ equations <- \(Param, N, Temp, G, Food, weight){
   # Ingested mass
   ing=ingmax*(weight^m)*fgT  # Potential ingestion rate  [g/d]
   
-  G=G*eff   # Food ingestion efficiency
+  G=ing/eff   # Food ingestion efficiency is used to assume that fish are fed to satiation but more is provided because they do not feed with absolute efficiency
   
   # Lowest feeding temperature threshold
   if (is.na(Temp)) print("Temp")
@@ -361,8 +365,7 @@ equations <- \(Param, N, Temp, G, Food, weight){
   # Available food limitation
   if (ing>G) {
     ingvero=G      # [g/d] Actual ingestion rate
-  }
-  else {
+  } else {
     ingvero=ing  # [g/d] Actual ingestion rate
   }
   
@@ -380,7 +383,7 @@ equations <- \(Param, N, Temp, G, Food, weight){
   exc=cbind(Pexc,Lexc,Cexc)
   
   # Compute waste
-  Pwst=((G/eff)-ingvero)*Pcont*N/1e3  # Proteins to waste [kg/d]
+  Pwst=((G)-ingvero)*Pcont*N/1e3  # Proteins to waste [kg/d]
   Lwst=((G/eff)-ingvero)*Lcont*N/1e3  # Lipids to waste [kg/d]
   Cwst=((G/eff)-ingvero)*Ccont*N/1e3  # Carbohydrates to waste [kg/d]
   wst=cbind(Pwst,Cwst,Lwst)
@@ -398,14 +401,14 @@ equations <- \(Param, N, Temp, G, Food, weight){
   dw = (anab-catab)/epstiss   # Weight increment [g/d]
   
   # Function outputs
-  output=list(dw,exc,wst,ing,ingvero,Tfun,metab, O2, NH4)
+  output=list(dw,exc,wst,ing,ingvero,Tfun,metab, O2, NH4, G)
   return(output)
 }
 
 
 #Runge-Kutte integration
 
-RKsolver <- \(Param, Temperature, G, Food, IC, times, N){
+RKsolver <- \(Param, Temperature, Food, IC, times, N){ #taken G out as an input and included it as a more dynamic function of ingestion (adjusted by efficiency)
   
   # Integration extremes definition
   ti=times[1]           # Integration beginning
@@ -425,6 +428,7 @@ RKsolver <- \(Param, Temperature, G, Food, IC, times, N){
   metab=as.matrix(matrix(0,nrow=ti,ncol=2))   # Initialize metabolic rates vector
   O2=as.matrix(matrix(0,nrow=ti))       # Initialize oxygen consumption rates vector
   NH4=as.matrix(matrix(0,nrow=ti))      # Initialize ammonia release rates vector
+  feed_available = as.matrix(matrix(0,nrow=ti))  # Initialize feed availability rates vector
   
   for (t in ti:(tf-1)) {
     
@@ -432,30 +436,30 @@ RKsolver <- \(Param, Temperature, G, Food, IC, times, N){
     
     # 1
     Tapp=Temperature[t]
-    Gapp=G[t]
+    #Gapp=G[t]
     Napp=N[t]
-    output<-equations(Param, Napp, Tapp, Gapp, Food, weight[t])
+    output<-equations(Param = Param, N = Napp, Temp = Tapp,  Food = Food, weight = weight[t]) # Taken Gapp out because G is resolved in equations
     dw=unlist(output[1])
     k1=timestep*dw
     
     # 2
     Tapp=approx(seq(from=1,to=tf,by=timestep),Temperature,xout=(t+timestep/2))
-    Gapp=approx(seq(from=1,to=tf,by=timestep),G,xout=(t+timestep/2))
-    output<-equations(Param, Napp, Tapp$y, Gapp$y, Food, weight[t]+k1/2)
+    #Gapp=approx(seq(from=1,to=tf,by=timestep),G,xout=(t+timestep/2))
+    output<-equations(Param, Napp, Tapp$y, Food, weight = weight[t]+k1/2)
     dw=unlist(output[1])
     k2=timestep*dw;
     
     # 3
     Tapp=approx(seq(from=1,to=tf,by=timestep),Temperature,xout=(t+timestep/2))
-    Gapp=approx(seq(from=1,to=tf,by=timestep),G,xout=(t+timestep/2))
-    output<-equations(Param, Napp, Tapp$y, Gapp$y, Food, weight[t]+k2/2)
+    #Gapp=approx(seq(from=1,to=tf,by=timestep),G,xout=(t+timestep/2))
+    output<-equations(Param, Napp, Tapp$y,Food, weight[t]+k2/2)
     dw=unlist(output[1])
     k3=timestep*dw;
     
     # 4
     Tapp=Temperature[t+timestep]
-    Gapp=G[t+timestep]
-    output<-equations(Param, Napp, Tapp, Gapp, Food, weight[t]+k3)
+    #Gapp=G[t+timestep]
+    output<-equations(Param = Param, N = Napp, Temp = Tapp,  Food = Food, weight = weight[t]+k3)
     dw=unlist(output[1])
     k4=timestep*dw;
     
@@ -463,7 +467,7 @@ RKsolver <- \(Param, Temperature, G, Food, IC, times, N){
     weight[t+timestep]=weight[t]+(k1+2*k2+2*k3+k4)/6;
     
     # Compute the other outputs of the model
-    output<-equations(Param, N[t+timestep], Temperature[t+timestep], G[t+timestep], Food, weight[t+timestep])
+    output<-equations(Param = Param, N = N[t+timestep], Temp = Temperature[t+timestep], Food = Food, weight = weight[t+timestep])
     
     # Extracts outputs from the output list
     excretion=output[[2]]
@@ -474,6 +478,7 @@ RKsolver <- \(Param, Temperature, G, Food, IC, times, N){
     metabolism=output[[7]]
     oxygen=output[[8]]
     ammonia=output[[9]]
+    feed_input = output[[10]]
     
     # Outputs creation
     wst=rbind(wst, waste)
@@ -484,10 +489,11 @@ RKsolver <- \(Param, Temperature, G, Food, IC, times, N){
     metab=rbind(metab, metabolism)
     O2=rbind(O2, oxygen)
     NH4=rbind(NH4, ammonia)
+    feed_input = rbind(feed_available, feed_input)
     
   }  # Close cycle
   
-  output=list(weight,exc,wst,ing,ingvero,tfun,metab, O2, NH4)
+  output=list(weight,exc,wst,ing,ingvero,tfun,metab, O2, NH4, feed_input)
   return(output) # Bream_pop_RKsolver output
   
 } # Close function
@@ -499,7 +505,7 @@ RKsolver <- \(Param, Temperature, G, Food, IC, times, N){
 
 # MONTE-CARLO SIMULATION
 
-loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
+loop <- \(Param, Tint, Food, IC, times, N, this_path) {
   
   cat("Population processing\n")
   
@@ -509,7 +515,7 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
   
   # Read files with population parameters and management strategies
   Pop_matrix <- read.csv(file.path(this_path,"params/Population.csv"), sep = ",")   # Reading the matrix containing population parameters and their description
-  Management <- read.csv(file.path(this_path,"management/Management.csv"), sep = ",")   # Reading the matrix containing seeding and harvesting management
+  #Management <- read.csv(file.path(this_path,"management/Management.csv"), sep = ",")   # Reading the matrix containing seeding and harvesting management
   
   # Extract population parameters
   meanW<-as.double(as.matrix(Pop_matrix[1,3]))      # [g] Dry weight average
@@ -522,15 +528,15 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
   nruns<-as.double(as.matrix(Pop_matrix[8,3]))      # [-] number of runs for population simulation
   
   # Prepare management values
-  manag <- as.matrix(matrix(0,nrow=length(Management[,1]),ncol=2))
-  for (i in 1:length(Management[,1])) {
-    manag[i,1]=as.numeric(as.Date(Management[i,1], "%d/%m/%Y"))-t0
-    if ((Management[i,2])=="h") {
-      manag[i,2]=-as.numeric(Management[i,3])
-    } else {
-      manag[i,2]=as.numeric(Management[i,3])
-    }
-  }
+  # manag <- as.matrix(matrix(0,nrow=length(Management[,1]),ncol=2))
+  # for (i in 1:length(Management[,1])) {
+  #   manag[i,1]=as.numeric(as.Date(Management[i,1], "%d/%m/%Y"))-t0
+  #   if ((Management[i,2])=="h") {
+  #     manag[i,2]=-as.numeric(Management[i,3])
+  #   } else {
+  #     manag[i,2]=as.numeric(Management[i,3])
+  #   }
+  # }
   
   # Vectors initialization
   saveIC=as.vector(matrix(0,nrow=nruns))            # Initialize initial conditions records: saves perturbated initial conditions for each run
@@ -547,6 +553,7 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
   C=as.matrix(matrix(0,nrow=nruns,ncol=tf))         # Initialize catabolic rate vector
   O2=as.matrix(matrix(0,nrow=nruns,ncol=tf))        # Initialize oxygen consumption rate vector
   NH4=as.matrix(matrix(0,nrow=nruns,ncol=tf))       # Initialize ammonium release rate vector
+  feed_available = as.matrix(matrix(0,nrow=nruns,ncol=tf)) # Initialise feeding vector
   
   # Population LOOP
   
@@ -554,7 +561,6 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
   
   for (ii in 1:nruns){
     
-  
     
     # Weight initialization
     IC=rnorm(1,meanW,deltaW)     # [g] initial weight extracted from a normal distribution
@@ -570,7 +576,7 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
     Param[1]=Imax
     
     # Solves ODE with perturbed parameters
-    output<-RKsolver(Param, Tint, Gint, Food, IC, times, N)
+    output<-RKsolver(Param, Tint,  Food, IC, times, N)
     
     # Unlist outputs
     weight=unlist(output[1])
@@ -582,6 +588,9 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
     metab=output[[7]]
     oxygen=output[[8]]
     ammonium=output[[9]]
+    feed_input = output[[10]]
+    
+    
     
     # Saves results of each run to compute statistics
     W[ii,1:length(weight)]=weight           # Tissue dry weight [g]
@@ -596,11 +605,13 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
     
     ingestion[ii,1:length(ingvero)]=t(ingvero)  # Actual ingested food [g/d]
     
+    
     A[ii,1:length(metab[,1])]=metab[,1]     # Net anabolism [J/d]
     C[ii,1:length(metab[,1])]=metab[,2]     # Fasting catabolism [J/d]
     
     O2[ii,1:length(oxygen)]=oxygen           # Tissue dry weight [kgO2/d]
     NH4[ii,1:length(ammonium)]=ammonium      # Tissue dry weight [kgN/d]
+    feed_available[ii,1:length(feed_input)]=feed_input      # Tissue dry weight [kgN/d]
     
     setTxtProgressBar(pb, ii)
     
@@ -633,8 +644,9 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
   
   O2_stat=t(rbind(colMeans(O2), colSds(O2)))
   NH4_stat=t(rbind(colMeans(NH4), colSds(NH4)))
+  feed_stat = t(rbind(colMeans(feed_available), colSds(feed_available)))
   
-  output=list(W_stat,Pexc_stat,Lexc_stat,Cexc_stat,ingestion_stat,Pwst_stat,Lwst_stat,Cwst_stat,A_stat,C_stat,fgT,frT, O2_stat, NH4_stat)
+  output=list(W_stat,Pexc_stat,Lexc_stat,Cexc_stat,ingestion_stat,Pwst_stat,Lwst_stat,Cwst_stat,A_stat,C_stat,fgT,frT, O2_stat, NH4_stat, feed_stat)
   return(output)
   
 }
@@ -644,7 +656,7 @@ loop <- \(Param, Tint, Gint, Food, IC, times, N, this_path) {
 
 # POST PROCESSING - plots the model outputs
 
-post_process <- function(this_path ,output,times,Dates,N,CS) {
+post_process <- function(this_path, this_farm_id, output,times,Dates,N, CS) {
   
   cat('Data post-processing\n')
   cat('\n')
@@ -667,29 +679,32 @@ post_process <- function(this_path ,output,times,Dates,N,CS) {
   frT=output[[12]]
   O2_stat=output[[13]]
   NH4_stat=output[[14]]
+  feed_stat = output[[15]]
   
   # Adjusts results acoording with integration extremes
   # now day 1 coincides with ti
   weightSave=W_stat[ti:tf,]
   
-  PexcSave=Pexc_stat[(ti+1):tf,]
-  LexcSave=Lexc_stat[(ti+1):tf,]
-  CexcSave=Cexc_stat[(ti+1):tf,]
+  PexcSave=Pexc_stat[ti:tf,]
+  LexcSave=Lexc_stat[ti:tf,]
+  CexcSave=Cexc_stat[ti:tf,]
   
   ingestionSave=ingestion_stat[(ti+1):tf,]
   
-  PwstSave=Pwst_stat[(ti+1):tf,]
-  LwstSave=Lwst_stat[(ti+1):tf,]
-  CwstSave=Cwst_stat[(ti+1):tf,]
+  PwstSave=Pwst_stat[ti:tf:tf,]
+  LwstSave=Lwst_stat[ti:tf,]
+  CwstSave=Cwst_stat[ti:tf,]
   
-  ASave=A_stat[(ti+1):tf,]
-  CSave=C_stat[(ti+1):tf,]
+  ASave=A_stat[ti:tf,]
+  CSave=C_stat[ti:tf,]
   
   fgT=fgT[(ti+1):tf]
   frT=frT[(ti+1):tf]
   
   O2Save=O2_stat[(ti+1):tf,]
   NH4Save=NH4_stat[(ti+1):tf,]
+  
+  feedSave = feed_stat[(ti+1):tf,]
   
   N=N[ti:tf]
   
@@ -734,57 +749,59 @@ post_process <- function(this_path ,output,times,Dates,N,CS) {
   output=list(weightSave,PexcSave,LexcSave,CexcSave,ingestionSave,PwstSave,LwstSave,CwstSave,ASave,CSave,fgT,frT,O2Save, NH4Save, N,daysToSize)
   
   # Plot results
-  days <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), by = "days", length = tf-ti) # create a dates vector to plot results
-  days2 <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), by = "days", length = tf-ti+1) # create a dates vector to plot results
-  currentpath=getwd()
+  days <- seq(from = ti, to = tf-1, by = 1) # create a dates vector to plot results
+  days2 <- seq(ti, by = 1, length = tf-ti+1) # create a dates vector to plot results
   
   # Plot weight
-  filepath=file.path(this_path,"/figures/outputs/weight.jpeg")
-  jpeg(filepath,800,600)
-  ub=weightSave[,1]+weightSave[,2]
-  lb=as.matrix(matrix(0,nrow=length(ub),ncol=1))
-  for (i in 1:length(weightSave[,1]-weightSave[,2])){
-    lb[i]=max(weightSave[i,1]-weightSave[i,2],0)
-  }
-  maxub=max(weightSave[,1]+weightSave[,2])
-  plot(days2,weightSave[,1],ylab="Weight (g)", xlab=" ",xaxt = "n",type="l",cex.lab=1.4,col="red",ylim=c(0,maxub+0.05*maxub))
-  polygon(c(days2,rev(days2)),c(lb,rev(ub)),col="grey90",border=FALSE)
-  lines(days2,weightSave[,1],lwd=2,col="red")
-  lines(days2,lb,col="blue")
-  lines(days2,ub,col="blue")
-  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
-  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
-  dev.off()
+
+  weight = data.frame(days = days2, weight = weightSave[,1], lower_bound = weightSave[,1]-weightSave[,2], upper_bound = weightSave[,1]+weightSave[,2])
+
+#plot weight    
+ggplot(data = weight)+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+    geom_line(aes(x = days, y = weight))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Weight (g)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/weight_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
   
   # plot excretion
-  filepath=file.path(this_path,"/figures/outputs/faeces_production.jpeg")
-  jpeg(filepath,800,600)
-  Lub=LexcSave[,1]+LexcSave[,2]
-  Pub=PexcSave[,1]+PexcSave[,2]
-  Cub=CexcSave[,1]+CexcSave[,2]
-  Llb=as.matrix(matrix(0,nrow=length(Lub),ncol=1))
-  Plb=as.matrix(matrix(0,nrow=length(Pub),ncol=1))
-  Clb=as.matrix(matrix(0,nrow=length(Cub),ncol=1))
-  for (i in 1:length(LexcSave[,1]-LexcSave[,2])){
-    Llb[i]=max(LexcSave[i,1]-LexcSave[i,2],0)
-    Plb[i]=max(PexcSave[i,1]-PexcSave[i,2],0)
-    Clb[i]=max(CexcSave[i,1]-CexcSave[i,2],0)
-  }
-  maxub=max(Lub,Pub,Cub)
-  plot(days,LexcSave[,1],ylab="Faeces production (kg/d)", xlab=" ",xaxt = "n",type="l",cex.lab=1.4,col="red",ylim=c(0,maxub+0.05*maxub))
-  polygon(c(days,rev(days)),c(Llb,rev(Lub)),col="grey75",border=FALSE)
-  lines(days,LexcSave[,1],lwd=2,col="red")
-  polygon(c(days,rev(days)),c(Plb,rev(Pub)),col="grey75",border=FALSE)
-  lines(days,PexcSave[,1],lwd=2,col="green")
-  polygon(c(days,rev(days)),c(Clb,rev(Cub)),col="grey75",border=FALSE)
-  lines(days,CexcSave[,1],lwd=2,col="blue")
-  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
-  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
-  legend("topleft",c("Proteins","Lipids","Carbohydrates"),fill=c("red","green","blue"))
-  dev.off()
-  
-  
-  # plot wasted food
+
+excretion <- 
+  rbind(
+  data.frame(days = days, 
+             mean_excretion = PexcSave[,1], 
+             lower_bound = PexcSave[,1]-PexcSave[,2], 
+             upper_bound = PexcSave[,1]+PexcSave[,2],
+             nutrient = "Protein"),
+  data.frame(days = days, 
+             mean_excretion = LexcSave[,1], 
+             lower_bound = LexcSave[,1]-LexcSave[,2], 
+             upper_bound = LexcSave[,1]+LexcSave[,2],
+             nutrient = "Lipid"),
+  data.frame(days = days, 
+             mean_excretion = CexcSave[,1], 
+             lower_bound = CexcSave[,1]-CexcSave[,2], 
+             upper_bound = CexcSave[,1]+CexcSave[,2],
+             nutrient = "Carbohydrates")
+  )
+
+ggplot(data = excretion)+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound, fill = nutrient), alpha = 0.2)+
+  geom_line(aes(x = days, y = mean_excretion, colour = nutrient))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Excretion (kg/day)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/excretion_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+
+  # plot wasted feed
   filepath=file.path(this_path,"/figures/outputs/wasted_feed.jpeg")
   jpeg(filepath,800,600)
   Lub=LwstSave[,1]+LwstSave[,2]
@@ -836,7 +853,7 @@ post_process <- function(this_path ,output,times,Dates,N,CS) {
   plot(days,fgT,ylab="Temperature response function",xlab=" ",xaxt = "n",cex.lab=1.4,col="red",type="l",ylim=c(0,ub+0.05*ub))
   lines(days,frT,col="blue")
   legend("topright",c("Anabolism","Catabolism"),fill=c("red","blue"))
-  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  labDates <- seq(ti:tf)
   axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
   dev.off()
   
@@ -1006,17 +1023,19 @@ model <- \(this_path, forcings, this_species){
   
   # Extract preprocessor outputs
   Param=out_pre[[1]]
-  Tint=out_pre[[2]]
-  Gint=out_pre[[3]]
-  Food=out_pre[[4]]
-  IC=out_pre[[5]]
-  times=out_pre[[6]]
-  Dates=out_pre[[7]]
-  N=out_pre[[8]]
-  CS=out_pre[[9]]
+  Temp=out_pre[[2]]
+  Food=out_pre[[3]]
+  IC=out_pre[[4]]
+  times=out_pre[[5]]
+  Dates=out_pre[[6]]
+  N=out_pre[[7]]
+  CS=out_pre[[8]]
+  
+  
+  
   
   # Manages population
-  out_RKsolver <- loop(Param, Tint, Gint, Food, IC, times, N, this_path)
+  out_RKsolver <- loop(Param, Tint, Food, IC, times, N, this_path)
   
   # Post-process data
   out_post<-post_process(this_path, out_RKsolver, times, Dates,N, CS)
