@@ -156,7 +156,6 @@ Pop_matrix
 ```
 
 ```{r}
-
 Spp_param=out_pre[[1]]
 Pop_param=out_pre[[2]]
 Tint=out_pre[[3]]
@@ -372,6 +371,7 @@ loop <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
   Pwst_stat = cbind(colMeans(Pwst_mat), colSds(Pwst_mat))
   Lwst_stat = cbind(colMeans(Lwst_mat), colSds(Lwst_mat))
   Cwst_stat = cbind(colMeans(Cwst_mat), colSds(Cwst_mat))
+  ingvero_stat = cbind(colMeans(ingvero_mat), colSds(ingvero_mat))
   anab_stat = cbind(colMeans(anab_mat), colSds(anab_mat))
   catab_stat = cbind(colMeans(catab_mat), colSds(catab_mat))
   O2_stat = cbind(colMeans(O2_mat), colSds(O2_mat))
@@ -396,6 +396,442 @@ loop <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
 
 
 
+
+
+
+
+post_process <- function(this_path, this_farm_id, out_loop, times, Dates, N, CS) {
+  
+  cat('Data post-processing\n')
+  cat('\n')
+  
+  ti=times[1]           # Integration beginning
+  tf=times[2]           # Integration end
+  
+  # Extracts outputs from the output list
+  W_stat=out_loop[[1]]
+  Bio_stat = out_loop[[2]]
+  Dw_stat = out_loop[[3]]
+  Epistiss_stat = out_loop[[4]]
+  Pexc_stat=out_loop[[5]]
+  Lexc_stat=out_loop[[6]]
+  Cexc_stat=out_loop[[7]]
+   Pwst_stat=out_loop[[8]]
+  Lwst_stat=out_loop[[9]]
+  Cwst_stat=out_loop[[10]]
+  Ingvero_stat=out_loop[[11]]
+  A_stat=out_loop[[12]]
+  C_stat=out_loop[[13]]
+  NH4_stat=out_loop[[14]]
+  O2_stat=out_loop[[15]]
+  Resource_stat = out_loop[[16]]
+  fgT_stat=out_loop[[17]]
+  frT_stat=out_loop[[18]]
+
+  
+  # Adjusts results acoording with integration extremes
+  # now day 1 coincides with ti
+  
+  
+  # Days to commercial size
+  
+  # Lower bound
+  foo <- function(w,S){which(w>S)[1]}
+  arg=as.data.frame(W_stat[,1]-weight_stat[,2])
+  days <- apply(arg,1,foo,S=CS)
+  days_L <- as.data.frame(days)
+  NonNAindex <- which(!is.na(days_L))
+  if (length(NonNAindex)==0) {
+    Lb_daysToSize="Not reaching the commercial size"
+  }else{  Lb_daysToSize <- min(NonNAindex)
+  }
+  
+  # Mean
+  foo <- function(w,S){which(w>S)[1]}
+  arg=as.data.frame(weight_stat[,1])
+  days <- apply(arg,1,foo,S=CS)
+  days_L <- as.data.frame(days)
+  NonNAindex <- which(!is.na(days_L))
+  if (length(NonNAindex)==0) {
+    Mean_daysToSize="Not reaching the commercial size"
+  }else{  Mean_daysToSize <- min(NonNAindex)
+  }
+  
+  # Upper bound
+  foo <- function(w,S){which(w>S)[1]}
+  arg=as.data.frame(weight_stat[,1]+weight_stat[,2])
+  days <- apply(arg,1,foo,S=CS)
+  days_L <- as.data.frame(days)
+  NonNAindex <- which(!is.na(days_L))
+  if (length(NonNAindex)==0) {
+    Ub_daysToSize="Not reaching the commercial size"
+  }else{  Ub_daysToSize <- min(NonNAindex)
+  }
+  
+  # List containing days to size
+  daysToSize<-as.list(cbind(Ub_daysToSize,Mean_daysToSize,Lb_daysToSize))
+  
+  
+  
+  out_post = list(W_stat, Bio_stat, dw_stat, Epistiss_stat, Pexc_stat, Lexc_stat, Cexc_stat, Pwst_stat, Lwst_stat, Cwst_stat, A_stat, C_stat, NH4_stat,O2_stat,  Resource_stat, fgT_stat, frT_stat, daysToSize, N)
+  
+  
+  
+  
+  # PLOT RESULTS
+  #shorter and longer version of days due to lag being used in some functions
+  
+  days <- seq(from = ti, to = tf-1, by = 1) # create a dates vector to plot results
+  days2 <- seq(ti, by = 1, length = tf-ti+1) # create a dates vector to plot results
+  
+  
+  
+  
+  
+  # Plot weight
+
+  weight_df = data.frame(days = days2, weight = W_stat[,1], lower_bound = W_stat[,1]-W_stat[,2], upper_bound = W_stat[,1]+W_stat[,2])
+
+#plot weight    
+ggplot(data = weight_df)+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+    geom_line(aes(x = days, y = weight))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Weight (g)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/weight_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+  
+
+
+  # plot biomass
+
+
+biomass_df = data.frame(days = days2, biomass = Bio_stat[,1], lower_bound = Bio_stat[,1]-Bio_stat[,2], upper_bound = Bio_stat[,1]+Bio_stat[,2])
+
+    
+ggplot(data = biomass_df)+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+    geom_line(aes(x = days, y = biomass))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Total farm biomass (tonnes)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))+
+  scale_y_continuous(labels = \(label) label/1e+6)
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/biomass_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+  
+
+  # plot dW
+
+
+dw_df = data.frame(days = days, dw = Dw_stat[,1][-730], lower_bound = Dw_stat[,1][-730]-Dw_stat[,2][-730], upper_bound = Dw_stat[,1][-730]+Dw_stat[,2][-730])
+
+    
+ggplot(data = dw_df)+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+    geom_line(aes(x = days, y = dw))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = bquote(Delta~ Body~weight~g~day^1))+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/dw_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+  
+
+#plot energy content of somatic tissue
+
+epistiss_df = data.frame(days = days, epistiss = Epistiss_stat[,1][-730], lower_bound = Epistiss_stat[,1][-730]-Epistiss_stat[,2][-730], upper_bound = Epistiss_stat[,1][-730]+Epistiss_stat[,2][-730])
+
+    
+ggplot(data = epistiss_df)+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+    geom_line(aes(x = days, y = epistiss))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Energy content of somatic tissue (J/g)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))
+
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/epistiss_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+# plot excretion
+
+excretion_df <- 
+  rbind(
+  data.frame(days = days2, 
+             mean_excretion = Pexc_stat[,1], 
+             lower_bound = Pexc_stat[,1]-Pexc_stat[,2], 
+             upper_bound = Pexc_stat[,1]+Pexc_stat[,2],
+             nutrient = "Protein"),
+  data.frame(days = days2, 
+             mean_excretion = Lexc_stat[,1], 
+             lower_bound = Lexc_stat[,1]-Lexc_stat[,2], 
+             upper_bound = Lexc_stat[,1]+Lexc_stat[,2],
+             nutrient = "Lipid"),
+  data.frame(days = days2, 
+             mean_excretion = Cexc_stat[,1], 
+             lower_bound = Cexc_stat[,1]-Cexc_stat[,2], 
+             upper_bound = Cexc_stat[,1]+Cexc_stat[,2],
+             nutrient = "Carbohydrates")
+  )
+
+
+ggplot(data = excretion_df |> filter(days != 730))+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound, fill = nutrient), alpha = 0.2)+
+  geom_line(aes(x = days, y = mean_excretion, colour = nutrient))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Excretion (kg/day)")+
+  theme(text=element_text(size=8),
+        legend.position = "inside",
+        legend.title = element_blank(),
+        legend.position.inside= c(0.2, 0.8),
+        legend.background = element_rect(fill="transparent"))+
+  scale_y_continuous(labels = \(label) label/1e+3)
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/excretion_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+  # plot wasted feed
+
+feed_waste_df <- 
+  rbind(
+  data.frame(days = days2, 
+             mean_waste = Pwst_stat[,1], 
+             lower_bound = Pwst_stat[,1]-Pwst_stat[,2], 
+             upper_bound = Pwst_stat[,1]+Pwst_stat[,2],
+             nutrient = "Protein"),
+  data.frame(days = days2, 
+             mean_waste = Lwst_stat[,1], 
+             lower_bound = Lwst_stat[,1]-Lwst_stat[,2], 
+             upper_bound = Lwst_stat[,1]+Lwst_stat[,2],
+             nutrient = "Lipid"),
+  data.frame(days = days2, 
+             mean_waste = Cwst_stat[,1], 
+             lower_bound = Cwst_stat[,1]-Cwst_stat[,2], 
+             upper_bound = Cwst_stat[,1]+Cwst_stat[,2],
+             nutrient = "Carbohydrates")
+  )
+
+ggplot(data = feed_waste_df |> filter(days != 730))+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound, fill = nutrient), alpha = 0.2)+
+  geom_line(aes(x = days, y = mean_waste, colour = nutrient))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Feed waste (kg/day)")+
+  theme(text=element_text(size=8),
+        legend.position = "inside",
+        legend.position.inside = c(0.25, 0.8),
+        legend.background = element_rect(fill="transparent"),
+        legend.title = element_blank())+
+  scale_y_continuous(labels = \(label) label/1e+3)
+
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/feed_waste_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+
+#plot ingestion
+
+
+ingvero_df = data.frame(days = days, ingvero = Ingvero_stat[,1][-730], lower_bound = Ingvero_stat[,1][-730]-Ingvero_stat[,2][-730], upper_bound = Ingvero_stat[,1][-730]+Ingvero_stat[,2][-730])
+
+
+
+ggplot(data = ingvero_df)+
+  geom_ribbon(aes(x = days, ymin = lower_bound, ymax = upper_bound), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+    geom_line(aes(x = days, y = ingvero))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Ingestion (kg/day)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))+
+  scale_y_continuous(labels = \(label) label/1e+3)
+
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/actual_ingestion_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+
+```
+
+
+```{r}
+filepath=file.path(this_path,"/figures/outputs/wasted_feed.jpeg")
+  jpeg(filepath,800,600)
+  Lub=LwstSave[,1]+LwstSave[,2]
+  Pub=PwstSave[,1]+PwstSave[,2]
+  Cub=CwstSave[,1]+CwstSave[,2]
+  Llb=as.matrix(matrix(0,nrow=length(Lub),ncol=1))
+  Plb=as.matrix(matrix(0,nrow=length(Pub),ncol=1))
+  Clb=as.matrix(matrix(0,nrow=length(Cub),ncol=1))
+  for (i in 1:length(LwstSave[,1]-LwstSave[,2])){
+    Llb[i]=max(LwstSave[i,1]-LwstSave[i,2],0)
+    Plb[i]=max(PwstSave[i,1]-PwstSave[i,2],0)
+    Clb[i]=max(CwstSave[i,1]-CwstSave[i,2],0)
+  }
+  maxub=max(Lub,Pub,Cub)
+  plot(days,LwstSave[,1],ylab="Wasted feed (kg/d)", xlab=" ",xaxt = "n",type="l",cex.lab=1.4,col="red",ylim=c(0,maxub+0.05*maxub))
+  polygon(c(days,rev(days)),c(Llb,rev(Lub)),col="grey75",border=FALSE)
+  lines(days,LwstSave[,1],lwd=2,col="red")
+  polygon(c(days,rev(days)),c(Plb,rev(Pub)),col="grey75",border=FALSE)
+  lines(days,PwstSave[,1],lwd=2,col="green")
+  polygon(c(days,rev(days)),c(Clb,rev(Cub)),col="grey75",border=FALSE)
+  lines(days,CwstSave[,1],lwd=2,col="blue")
+  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  legend("topleft",c("Proteins","Lipids","Carbohydrates"),fill=c("red","green","blue"))
+  dev.off()
+  
+  # plot ingested food
+  filepath=file.path(this_path,"figures/outputs/actual_ingestion.jpeg")
+  jpeg(filepath,800,600)
+  ub=ingestionSave[,1]+ingestionSave[,2]
+  lb=as.matrix(matrix(0,nrow=length(ub),ncol=1))
+  for (i in 1:length(ingestionSave[,1]-ingestionSave[,2])){
+    lb[i]=max(ingestionSave[i,1]-ingestionSave[i,2],0)
+  }
+  maxub=max(ingestionSave[,1]+ingestionSave[,2])
+  plot(days,ingestionSave[,1],ylab="Ingested food (g)", xlab=" ",xaxt = "n",type="l",cex.lab=1.4,col="red",ylim=c(0,maxub+0.05*maxub))
+  polygon(c(days,rev(days)),c(lb,rev(ub)),col="grey90",border=FALSE)
+  lines(days,ingestionSave[,1],lwd=2,col="red")
+  lines(days,lb,col="blue")
+  lines(days,ub,col="blue")
+  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  dev.off()
+  
+  # plot limitation functions
+  filepath=file.path(this_path,"figures/outputs/temperature_response.jpeg")
+  jpeg(filepath,800,600)
+  ub=max(max(fgT),max(frT))
+  plot(days,fgT,ylab="Temperature response function",xlab=" ",xaxt = "n",cex.lab=1.4,col="red",type="l",ylim=c(0,ub+0.05*ub))
+  lines(days,frT,col="blue")
+  legend("topright",c("Anabolism","Catabolism"),fill=c("red","blue"))
+  labDates <- seq(ti:tf)
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  dev.off()
+  
+  # plot metabolic rates
+  filepath=file.path(this_path,"/figures/outputs/metabolism.jpeg")
+  jpeg(filepath,800,600)
+  Aub=ASave[,1]+ASave[,2]
+  Cub=CSave[,1]+CSave[,2]
+  Alb=as.matrix(matrix(0,nrow=length(Aub),ncol=1))
+  Clb=as.matrix(matrix(0,nrow=length(Cub),ncol=1))
+  for (i in 1:length(LwstSave[,1]-LwstSave[,2])){
+    Alb[i]=max(ASave[i,1]-ASave[i,2],0)
+    Clb[i]=max(CSave[i,1]-CSave[i,2],0)
+  }
+  maxub=max(Aub,Cub)
+  plot(days,ASave[,1],ylab="Metabolic rates (J/d)", xlab=" ",xaxt = "n",type="l",cex.lab=1.4,col="red",ylim=c(0,maxub+0.05*maxub))
+  polygon(c(days,rev(days)),c(Alb,rev(Aub)),col="grey75",border=FALSE)
+  lines(days,ASave[,1],lwd=2,col="red")
+  polygon(c(days,rev(days)),c(Clb,rev(Cub)),col="grey75",border=FALSE)
+  lines(days,CSave[,1],lwd=2,col="blue")
+  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  legend("topleft",c("Anabolic rate","Catabolic rate"),fill=c("red","blue"))
+  dev.off()
+  
+  # plot population dynamics
+  filepath=file.path(this_path,"/figures/outputs/Population.jpeg")
+  jpeg(filepath,800,600)
+  plot(days2, N, ylab="Number of individuals", xlab="", xaxt = "n",type="l",cex.lab=1.4)
+  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  dev.off()
+  
+  # plot O2 consumption
+  filepath=file.path(this_path,"/figures/outputs/O2_consumption.jpeg")
+  jpeg(filepath,800,600)
+  ub=O2Save[,1]+O2Save[,2]
+  lb=as.matrix(matrix(0,nrow=length(ub),ncol=1))
+  for (i in 1:length(O2Save[,1]-O2Save[,2])){
+    lb[i]=max(O2Save[i,1]-O2Save[i,2],0)
+  }
+  maxub=max(O2Save[,1]+O2Save[,2])
+  plot(days,O2Save[,1],ylab="O2 consumption (kgO2/d)", xlab=" ",xaxt = "n",type="l",cex.lab=1.4,col="red",ylim=c(0,maxub+0.05*maxub))
+  polygon(c(days,rev(days)),c(lb,rev(ub)),col="grey90",border=FALSE)
+  lines(days,O2Save[,1],lwd=2,col="red")
+  lines(days,lb,col="blue")
+  lines(days,ub,col="blue")
+  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  dev.off()
+  
+  # plot NH4 production
+  filepath=file.path(this_path,"/figures/outputs/NH4_release.jpeg")
+  jpeg(filepath,800,600)
+  ub=NH4Save[,1]+NH4Save[,2]
+  lb=as.matrix(matrix(0,nrow=length(ub),ncol=1))
+  for (i in 1:length(NH4Save[,1]-NH4Save[,2])){
+    lb[i]=max(NH4Save[i,1]-NH4Save[i,2],0)
+  }
+  maxub=max(NH4Save[,1]+NH4Save[,2])
+  plot(days,NH4Save[,1],ylab="NH4 release (kgN/d)", xlab=" ",xaxt = "n",type="l",cex.lab=1.4,col="red",ylim=c(0,maxub+0.05*maxub))
+  polygon(c(days,rev(days)),c(lb,rev(ub)),col="grey90",border=FALSE)
+  lines(days,NH4Save[,1],lwd=2,col="red")
+  lines(days,lb,col="blue")
+  lines(days,ub,col="blue")
+  labDates <- seq(as.Date(Dates[1], format = "%d/%m/%Y"), tail(days, 1), by = "months")
+  axis.Date(side = 1, days, at = labDates, format = "%d %b %y", las = 2)
+  dev.off()
+  
+  # Results save
+  filepath=file.path(this_path,"/data_products/weight.csv")
+  write.csv(weightSave,filepath)
+  
+  filepath=file.path(this_path,"data_products/faeces_production_Proteins.csv")
+  write.csv(PexcSave,filepath)
+  
+  filepath=file.path(this_path,"/data_products/faeces_production_Lipids.csv")
+  write.csv(LexcSave,filepath)
+  
+  filepath=file.path(this_path,"/data_products/faeces_production_Carbohydrates.csv")
+  write.csv(CexcSave,filepath)
+  
+  filepath=file.path(this_path,"data_products/wasted_feed_Proteins.csv")
+  write.csv(PwstSave,filepath)
+  
+  filepath=file.path(this_path,"/data_products/wasted_feed_Lipids.csv")
+  write.csv(LwstSave,filepath)
+  
+  filepath=file.path(this_path,"/data_products/wasted_feed_Carbohydrates.csv")
+  write.csv(CwstSave,filepath)
+  
+  filepath=file.path(this_path,"/data_products/actual_ingestion.csv")
+  write.csv(ingestionSave,filepath)
+  
+  filepath=file.path(this_path,"/data_products/anabolic_rate.csv")
+  write.csv(ASave,filepath)
+  
+  filepath=file.path(this_path,"/data_products/catabolic_rate.csv")
+  write.csv(CSave,filepath)
+  
+  tfun=cbind(fgT,frT)
+  
+  filepath=file.path(this_path,"/data_products/temperature_response.csv")
+  write.csv(tfun,filepath)
+  
+  filepath=file.path(this_path,"/data_products/O2_consumption.csv")
+  write.csv(O2Save,filepath)
+  
+  filepath=file.path(this_path,"/data_products/NH4_release.csv")
+  write.csv(NH4Save,filepath)
+  
+  filepath=file.path(this_path,"/data_products/population.csv")
+  write.csv(N,filepath)
+  
+  filepath=file.path(this_path,"/data_products/Days_to_commercial_size.csv")
+  write.csv(daysToSize,filepath)
+  
+  return(output)
+  
+}
 
 
 
@@ -497,8 +933,7 @@ ggplot(data = Pwst_df)+
   geom_line(aes(x = days, y = mean))+
   theme_bw()+
   labs(x = "Production cycle (days)", y = "Protein waste from feed (g)")+
-  guides(alpha = "none", fill = "none", colour = "none")+
-  theme(text=element_text(size=8))
+  theme(text=element_text(size=8))+
 
 
 
