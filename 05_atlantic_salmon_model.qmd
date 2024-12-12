@@ -23,7 +23,6 @@ this_path <- sprintf(here("data/%s"), this_species)
 
 ```
 
-
 Prep temperature forcings for each farm site
 
 ```{r}
@@ -104,7 +103,6 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
 
 ```
 
-
 Run model for each location under reference feed.
 
 ```{r}
@@ -132,15 +130,7 @@ map(.x = farm_list, .f = \(this_farm){
   
   out_pre <- preprocess(this_path = this_path, these_forcings = forcings, this_feed = "reference", this_stocking_N = this_stocking_N)
   
-  Param=out_pre[[1]]
-  Tint=out_pre[[2]]
-  #Gint=out_pre[[3]]
-  Food=out_pre[[3]]
-  IC=out_pre[[4]]
-  times=out_pre[[5]]
-  Dates=out_pre[[6]]
-  N=out_pre[[7]]
-  CS=out_pre[[8]]
+ 
   
   out_RK_solver <- loop(Param, Tint, Food, IC, times, N, this_path = this_path)
   
@@ -165,3 +155,396 @@ Pop_matrix
 
 ```
 
+```{r}
+
+Spp_param=out_pre[[1]]
+Pop_param=out_pre[[2]]
+Tint=out_pre[[3]]
+#Gint=out_pre[[3]]
+Food=out_pre[[4]]
+IC=out_pre[[5]]
+times=out_pre[[6]]
+Dates=out_pre[[7]]
+N=out_pre[[8]]
+CS=out_pre[[9]]
+
+Path = this_path
+
+
+
+
+ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
+  
+  
+  # Parameters definition
+  ingmax=rnorm(1, mean = Pop_param[4], sd = Pop_param[5])     # [g/d] Maximum ingestion rate
+  alpha=Spp_param[2]         # [-] Feeding catabolism coefficient
+  betaprot=Spp_param[3]      # [-] Assimilation coefficient for protein
+  betalip=Spp_param[4]       # [-] Assimilation coefficient for lipid
+  betacarb=Spp_param[5]      # [-] Assimilation coefficient for carbohydrates
+  epsprot=Spp_param[6]       # [J/gprot] Energy content of protein
+  epslip=Spp_param[7]        # [J/glip] Energy content of lipid
+  epscarb=Spp_param[8]       # [J/gcarb] Energy content of carbohydrate
+  epsO2=Spp_param[9]         # [J/gO2] Energy consumed by the respiration of 1g of oxygen
+  pk=Spp_param[10]           # [1/day] Temperature coefficient for the fasting catabolism
+  k0=Spp_param[11]           # [1/Celsius degree]  Fasting catabolism at 0 Celsius degree
+  m=Spp_param[12]            # [-] Weight exponent for the anabolism
+  n=Spp_param[13]            # [-] Weight exponent for the catabolism
+  betac=Spp_param[14]        # [-]  Shape coefficient for the H(Tw) function
+  Tma=Spp_param[15]          # [Celsius degree] Maximum lethal temperature for Dicentrarchus labrax
+  Toa=Spp_param[16]          # [Celsius degree] Optimal temperature for Dicentrarchus labrax
+  Taa=Spp_param[17]          # [Celsius degree] Lowest feeding temperature for Dicentrarchus labrax
+  omega=Spp_param[18]        # [gO2/g] Oxygen consumption - weight loss ratio
+  a=Spp_param[19]            # [J/gtissue] Energy content of fish tissue
+  k=Spp_param[20]            # [-] Weight exponent for energy content
+  eff=Spp_param[21]          # [-] Food ingestion efficiency
+  
+  # Food composition definition
+  Pcont=Food[1]       # [-] Percentage of proteins in the food
+  Lcont=Food[2]       # [-] Percentage of lipids in the food
+  Ccont=Food[3]       # [-] Percentage of carbohydrates in the food
+  
+  # Weight and resource
+  ti = times[1]
+  tf = times[2]                                 # number of days 
+  dt = times[3]                               # time step
+  # isave = 1
+  # nsave  <- floor(tmax/(dt*isave)) # no. of time slots to save
+  days<-(1:tf)*dt
+  
+  weight <- rep(0,nsave)
+  weight[ti]<- rnorm(1, mean = Pop_param[1], sd = Pop_param[2]) # start size in grams
+  # 
+  # # vectors of the other important growth metrics: intake, functional response, assimilated energy and growth increment
+  fgT <- rep(0, nsave)
+  frT <- rep(0, nsave)
+  Tfun <- rep(0, nsave)
+  ing <- rep(0, nsave)
+  resource <- rep(0, nsave)
+  G <- rep(0, nsave)
+  ingvero <- rep(0, nsave)
+  epstiss <- rep(0, nsave)
+  assE <- rep(0, nsave)
+  Pexc <- rep(0, nsave)
+  Lexc <- rep(0, nsave)
+  Cexc <- rep(0, nsave)
+  exc <- rep(0, nsave)
+  Pwst <- rep(0, nsave)
+  Lwst <- rep(0, nsave)
+  Cwst <- rep(0, nsave)
+  wst <- rep(0, nsave)
+  anab <- rep(0, nsave)
+  catab <- rep(0, nsave)
+  metab <- rep(0, nsave)
+  O2 <- rep(0, nsave)
+  NH4 <- rep(0, nsave)
+  dw <- rep(0, nsave)
+  
+  # EQUATIONS
+  for (i in 1:(nsave-1)){
+    
+  # Forcing temperature
+  fgT[i]= exp(betac*(Temp[i]-Toa))*((Tma-Temp[i])/(Tma-Toa))^(betac*(Tma-Toa))   # Optimum Temperature dependence for ingestion
+  frT[i]= exp(pk*Temp[i])                                                       # Exponential Temperature dependence for catabolism
+  # Tfun[i]=cbind(fgT[i], frT[i])                                               # Output with temperature limitation functions
+  
+  # Ingested mass
+  ing[i]=ingmax*(weight[i]^m)*fgT[i]   # [g/d] Potential ingestion rate
+  resource[i] = 0.066*weight[i]^0.75 # this is taken from the salmon model
+  G[i] = eff*resource[i]
+  
+  # # Lowest feeding temperature threshold
+  if (Temp[i]<Taa) {
+    ing=0
+  }
+
+  # reduced feeding at temps higher than optimal temp
+  if (Temp[i]>Toa) {
+    ing[i] = 0
+  }
+  
+  # Available food limitation
+  if (ing[i] > G[i]) {
+    ingvero[i] = G[i]         # [g/d] Actual ingestion rate
+  }  else {
+    ingvero[i] = ing[i]     # [g/d] Actual ingestion rate
+  }
+  
+  # Energy content of somatic tissue [J/g] Source: Lupatsch et al. (2003)
+  epstiss[i] = a*weight[i]^k
+  
+  # Ingested energy
+  diet = Pcont*epsprot*betaprot+Lcont*epslip*betalip+Ccont*epscarb*betacarb # [J/g] Energy content of the ingested food
+  assE[i] = ingvero[i]*diet # [J/d] Ingested energy
+  
+  # Compute excretion (not sure if this is actually dissolved inorganic nutrients)
+  Pexc[i] = (1-betaprot)*Pcont*ingvero[i]  # Excreted proteins [g/d]
+  Lexc[i] = (1-betalip)*Lcont*ingvero[i]   # Excreted lipids [g/d]
+  Cexc[i] = (1-betacarb)*Ccont*ingvero[i]  # Excreted carbohydrates [g/d]
+  # exc[i]=cbind(Pexc[i],Lexc[i],Cexc[i])        # Output with excretion values
+  
+  # Compute waste (this is uneaten feed only - does not include solid faecal matter)
+  Pwst[i]=((G[i]/eff)-ingvero[i])*Pcont     # Proteins to waste [g/d]
+  Lwst[i]=((G[i]/eff)-ingvero[i])*Lcont     # Lipids to waste [g/d]
+  Cwst[i]=((G[i]/eff)-ingvero[i])*Ccont     # Carbohydrates to waste [g/d]
+  # wst[i]=cbind(Pwst[i],Cwst[i],Lwst[i])        # Output with waste values
+  
+  # Metabolism terms
+  anab[i]=assE[i]*(1-alpha)                    # Net anabolism [J/d]
+  catab[i]=epsO2*k0*frT[i]*(weight[i]^n)*omega    # Fasting catabolism [J/d]
+  # metab[i]=cbind(anab[i],catab[i])                # Output with metabolic rates
+  
+  # O2 and NH4 produced
+  O2[i]=catab[i]/epsO2          # O2 consumed [g02/d]
+  NH4[i]=O2[i]*0.06             # NH4 produced [gN/d]
+  
+  # Mass balance
+  dw[i] = (anab[i]-catab[i])/epstiss[i] # weight increment [g/d]
+  
+  weight[i+1] = weight[i] + dw[i]*dt
+  }
+  # Function outputs
+  output=cbind(days, weight, biomass = weight*N[ti:tf], dw, epstiss, Pexc_total = Pexc*N[ti:tf], Lexc_total = Lexc*N[ti:tf], Cexc_total = Cexc*N[ti:tf], Pwst_total = Pwst*N[ti:tf], Lwst_total = Lwst*N[ti:tf], Cwst_total = Cwst*N[ti:tf], ing_total = ing*N[ti:tf], ingvero_total = ingvero*N[ti:tf], anab, catab, O2, NH4_total = NH4*N[ti:tf], resource_total = resource*N[ti:tf], fgT, frT, Temp)
+  return(output) 
+}
+
+
+
+loop <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
+
+  #initiate matrices to fill for each population iteration
+  
+  weight_mat <- matrix(data = 0, nrow = nruns, ncol = tf)
+  biomass_mat <- matrix(data = 0, nrow = nruns, ncol = tf)
+  dw_mat <- matrix(data = 0, nrow = nruns, ncol = tf)
+  epistiss_mat <- matrix(data = 0, nrow = nruns, ncol = tf)
+  Pexc_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  Lexc_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  Cexc_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  Pwst_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  Lwst_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  Cwst_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  ingvero_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  anab_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  catab_mat <- matrix(data = 0, nrow = nruns, ncol = tf)
+  O2_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  NH4_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  resource_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  fgT_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  frT_mat <- matrix(data = 0, nrow = nruns, ncol = tf) 
+  
+  
+  for(n in 1:nruns){
+    
+    message("Running population for ", this_species, ",  ", this_farm_id, ", iteration ", n)
+    
+    ind_output <- ind_equations(Path = Path, Pop_param = Pop_param, Spp_param = Spp_param, Temp = Temp, Food = Food, times = times,N = N)
+    
+    #append to matrix
+    weight_mat[n,] <- ind_output[,2]
+    biomass_mat[n,] <- ind_output[,3]
+    dw_mat[n,] <- ind_output[,4]
+    epistiss_mat[n,] <- ind_output[,5]
+    Pexc_mat[n,] <-  ind_output[,6]
+    Lexc_mat[n,] <-  ind_output[,7]
+    Cexc_mat[n,] <-  ind_output[,8]
+    Pwst_mat[n,] <-  ind_output[,9]
+    Lwst_mat[n,] <-  ind_output[,10]
+    Cwst_mat[n,] <-  ind_output[,11]
+    ingvero_mat[n,] <-  ind_output[,13]
+    anab_mat[n,] <-  ind_output[,14]
+    catab_mat[n,] <-  ind_output[,15]
+    O2_mat[n,] <-  ind_output[,16]
+    NH4_mat[n,] <-  ind_output[,17]
+    resource_mat[n,] <- ind_output[,18]
+    fgT_mat[n,] <-  ind_output[,19]
+    frT_mat[n,] <-  ind_output[,20]
+    
+  }
+  
+  weight_stat = cbind(colMeans(weight_mat), colSds(weight_mat))
+  biomass_stat = cbind(colMeans(biomass_mat), colSds(biomass_mat))
+  dw_stat = cbind(colMeans(dw_mat), colSds(dw_mat))
+  epistiss_stat = cbind(colMeans(epistiss_mat), colSds(epistiss_mat))
+  Pexc_stat = cbind(colMeans(Pexc_mat), colSds(Pexc_mat))
+  Lexc_stat = cbind(colMeans(Lexc_mat), colSds(Lexc_mat))
+  Cexc_stat = cbind(colMeans(Cexc_mat), colSds(Cexc_mat))
+  Pwst_stat = cbind(colMeans(Pwst_mat), colSds(Pwst_mat))
+  Lwst_stat = cbind(colMeans(Lwst_mat), colSds(Lwst_mat))
+  Cwst_stat = cbind(colMeans(Cwst_mat), colSds(Cwst_mat))
+  anab_stat = cbind(colMeans(anab_mat), colSds(anab_mat))
+  catab_stat = cbind(colMeans(catab_mat), colSds(catab_mat))
+  O2_stat = cbind(colMeans(O2_mat), colSds(O2_mat))
+  NH4_stat = cbind(colMeans(NH4_mat), colSds(NH4_mat))
+  resource_stat = cbind(colMeans(resource_mat), colSds(resource_mat))
+  fgT_stat = cbind(colMeans(fgT_mat), colSds(fgT_mat))
+  frT_stat = cbind(colMeans(frT_mat), colSds(frT_mat))
+  
+  
+  
+  out_loop <- list(weight_stat, biomass_stat, dw_stat, 
+                   epistiss_stat, 
+                   Pexc_stat, Lexc_stat, Cexc_stat,
+                   Pwst_stat, Lwst_stat, Cwst_stat, 
+                   ingvero_stat, anab_stat, catab_stat,
+                   O2_stat, NH4_stat, resource_stat,
+                   fgT_stat, frT_stat)
+  
+  return(out_loop)
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+biomass_stat = cbind(colMeans(weight_mat), colSds(weight_mat), 1:tf)
+biomass_stat = cbind(colSums(weight_mat),  1:tf)
+Pexc_stat = cbind(colMeans(Pexc_mat), colSds(Pexc_mat),  1:tf)
+Lexc_stat = cbind(colMeans(Lexc_mat), colSds(Lexc_mat))
+Cexc_stat = cbind(colMeans(Cexc_mat), colSds(Cexc_mat))
+Pwst_stat = cbind(colMeans(Pwst_mat), colSds(Pwst_mat),  1:tf)
+Lwst_stat = cbind(colMeans(Lwst_mat), colSds(Lwst_mat))
+Cwst_stat = cbind(colMeans(Cwst_mat), colSds(Cwst_mat))
+ingvero_stat = cbind(colMeans(ingvero_mat), colSds(ingvero_mat))
+anab_stat = cbind(colMeans(anab_mat), colSds(anab_mat))
+catab_stat = cbind(colMeans(catab_mat), colSds(catab_mat))
+O2_stat = cbind(colMeans(O2_mat), colSds(O2_mat))
+NH4_stat = cbind(colMeans(NH4_mat), colSds(NH4_mat))
+resource_stat = cbind(colSums(resource_mat),  1:tf)
+
+
+biomass_df <- as.data.frame(biomass_stat) |> 
+  rename(mean=V1, sd=V2, days=V3)
+
+
+
+ggplot(data = biomass_df)+
+  geom_ribbon(aes(x = days, ymin = mean-sd, ymax = mean+sd), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+  geom_line(aes(x = days, y = mean))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Biomass (tonnes)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))+
+  scale_y_continuous(labels = \(y) y/1000000)
+
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/weight_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+biomass_df <- as.data.frame(biomass_stat) |> 
+  rename(biomass=V1, days=V2)
+
+
+
+ggplot(data = biomass_df)+
+  geom_line(aes(x = days, y = biomass/1000000))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Biomass (tonnes)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))
+
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/biomass_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+
+Pexc_df <- as.data.frame(Pexc_stat) |> 
+  rename(mean=V1, sd=V2, days=V3)
+
+
+
+ggplot(data = Pexc_df)+
+  geom_ribbon(aes(x = days, ymin = mean-sd, ymax = mean+sd), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+  geom_line(aes(x = days, y = mean))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Protein excretion (g)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))
+
+
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/Pexc_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+
+
+
+Pwst_df <- as.data.frame(Pwst_stat) |> 
+  rename(mean=V1, sd=V2, days=V3)
+
+
+
+ggplot(data = Pwst_df)+
+  geom_ribbon(aes(x = days, ymin = mean-sd, ymax = mean+sd), alpha = 0.2, fill = "salmon", colour = "grey50", linetype = "dashed")+
+  geom_line(aes(x = days, y = mean))+
+  theme_bw()+
+  labs(x = "Production cycle (days)", y = "Protein waste from feed (g)")+
+  guides(alpha = "none", fill = "none", colour = "none")+
+  theme(text=element_text(size=8))
+
+
+
+ggsave(filename = file.path(this_path, sprintf("figures/outputs/Pwst_%s.jpeg", this_farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+
+
+
+
+#stopCluster(cl)
+  
+
+output_labels <- c("weight", 
+                   "protein_exc", "lipid_exc", "carb_exc",
+                   "protein_wst", "lipid_wst", "carb_wst",
+                   "ingvero", "anab", "catab", "O2", "NH4",
+                   "resource", "fgt_mat", "frT_mat")
+
+
+#test function
+# this_df <- population_output[1]
+# this_label <- output_labels[1]
+  
+map2(.x = population_output, .y = output_labels, \(this_df, this_label){
+  
+  this_df <- data.frame(this_df)
+  rownames(this_df) <- 1:nrow(this_df)
+  colnames(this_df) <- 1:tf
+  
+  qsave(x = this_df, file = file.path(Path, sprintf("data_products/large_files/%s_%s.qs", this_label, this_farm_id)))
+  
+})
+ 
+  
+  
+  
+  
+
+
+
+
+
+
+
+
+
+
+```
+
+ 

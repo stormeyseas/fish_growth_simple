@@ -130,8 +130,6 @@ preprocess <- \(this_path, these_forcings, this_feed, this_stocking_N){
   # Extracts forcings values from the list
   timeT <- these_forcings[[1]]
   Temperature <- these_forcings[[2]]
-  # timeF <- these_forcings[[3]]
-  # Feed <- these_forcings[[4]]
   
   
   # Read forcings and parameters from .csv files
@@ -139,8 +137,8 @@ preprocess <- \(this_path, these_forcings, this_feed, this_stocking_N){
   Food <- read.csv(sprintf(file.path(this_path, "forcings/Food_characterization_%s.csv"), this_feed), sep = ",", header = FALSE)    # Reading the food composition (Proteins, Lipids, Carbohydrates) data
   
   # Extract parameters and forcing values from parameters matrix and convert to type 'double' the vector contents
-  Param <-  as.matrix(Param_matrix[1:21,3])           # Vector containing all parameters
-  Param <-  suppressWarnings(as.numeric(Param))
+  Spp_param <-  as.matrix(Param_matrix[1:21,3])           # Vector containing all parameters
+  Spp_param <-  suppressWarnings(as.numeric(Param))
   Dates <- Param_matrix[22:23,3]                      # Vector containing the starting and ending date of the simulation
   #IC=as.double(as.matrix(Param_matrix[24,3]))        # Initial weight condition - hashed out for randomization in population model
   CS <- as.double(as.matrix(Param_matrix[25,3]))      # Commercial size
@@ -171,7 +169,6 @@ Pop_matrix <- read.csv(file.path(this_path,"params/Population.csv"), sep = ",") 
   # Extract population parameters
   meanW <- as.double(as.matrix(Pop_matrix[1,3]))      # [g] Dry weight average
   deltaW <- as.double(as.matrix(Pop_matrix[2,3]))     # [g] Dry weight standard deviation
-  IC<- deltaW
   Wlb <- as.double(as.matrix(Pop_matrix[3,3]))        # [g] Dry weight lower bound
   meanImax <- as.double(as.matrix(Pop_matrix[4,3]))   # [l/d gDW] Clearance rate average
   deltaImax <- as.double(as.matrix(Pop_matrix[5,3]))  # [l/d gDW] Clearance rate standard deviation
@@ -179,22 +176,8 @@ Pop_matrix <- read.csv(file.path(this_path,"params/Population.csv"), sep = ",") 
   mortmyt <- as.double(as.matrix(Pop_matrix[7,3]))    # [1/d] natural mortality rate
   nruns <- as.double(as.matrix(Pop_matrix[8,3]))      # [-] number of runs for population simulation
   
+  Pop_param <- c(meanW, deltaW, Wlb, meanImax, deltaImax, Nseed, mortmyt, nruns)
 
-  #Not using realistic management values at present
-  
-    # # Prepare management values
-  # manag <- as.matrix(matrix(0,nrow=length(Management[,1]),ncol=2))
-  # 
-  # for (i in 1:length(Management[,1])) {
-  #   manag[i,1]=as.numeric(as.Date(Management[i,1], "%d/%m/%Y"))-t0
-  #   if ((Management[i,2])=="h") {
-  #     manag[i,2]=-as.numeric(Management[i,3])
-  #   } else {
-  #     manag[i,2]=as.numeric(Management[i,3])
-  #   }
-  # }
-  # 
-  # 
   
   # Population differential equation solution - uses first order Runge Kutta integration (Eulers method) to estimate population number at subsequent time step given an initial slope (N*mortality)
   
@@ -296,7 +279,7 @@ ggsave(filename = file.path(this_path, sprintf("figures/inputs/Population_%s.jpe
   
 
   
-  output <- list(Param, Temperature, Food, IC, times, Dates, N,CS)
+  output <- list(Spp_param, Pop_param, Temperature, Food, IC, times, Dates, N,CS)
   return(output)
 }
 
