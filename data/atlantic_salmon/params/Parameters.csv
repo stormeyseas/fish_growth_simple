@@ -22,15 +22,14 @@ Toa,Optimal temperature ,18,∞C,"Jonsson, Forseth, Jensen & Næsje 2001 Thermal
 – temperature ranges: 5–24°C
 alt value: 14°C (Handeland et al. 2008 The effect of temperature and fish size on growth, feed intake, food conversion efficiency and stomach evacuation rate of Atlantic salmon post-smolts, Aquaculture 283, 36–42.
 – Salmo salar (initial size: 77.0 ± 14.6g, temps: 6, 10, 14, 18°C)"
-Taa,Lowest feeding temperature ,6,∞C,"Jonsson, Forseth, Jensen & Næsje 2001 Thermal performance of juvenile Atlantic salmon, Salmo salar L., Functional Ecology 15, 701-711.
-– fish size range: 2.25±0.49 – 11.5±5.29g 
-– temperature ranges: 5–24°C"
+Taa,Lowest feeding temperature ,2,∞C,"Vadboncouer et al 2023 Lowering temperature to 1 °C results in physiological changes, stress and mortality in cultured Atlantic Salmon (Salmo salar) https://www.sciencedirect.com/science/article/pii/S0044848623000868#f0015 (fish essentially stop feeding when below 2 degrees)
+"
 omega,Oxygen consumption ñ weight loss ratio,0.6542,gO2/g,calibrated value from Baldan et al. 2018
 a,Energy content of fish parameter,2669,J/gfish,"Tien et al. 2016 Development of a nutritional model to define the energy and nutrient requirements of cobia, Rachycentron canadum, Aquaculture 463, 193-200.
 alt value: 17.02350 (nls model fitted to female Atlantic salmon data extracted and transformed from Jonsson & Jonsson (2003) doi: 10.1139/F03-042)"
 k,Weight exponent for energy content,0.1715,-,"Tien et al. 2016 Development of a nutritional model to define the energy and nutrient requirements of cobia, Rachycentron canadum, Aquaculture 463, 193-200.
 alt value: 1.65175 (nls model fitted to female Atlantic salmon data extracted and transformed from Jonsson & Jonsson (2003) doi: 10.1139/F03-042)"
-eff,Food ingestion efficiency,0.95,-,"Uglem I,  Toledo-Guedes K,  Sanchez-Jerez P,  Ulvan EM,  Evensen T,  Sæther BS.  Does waste feed from salmon farming affect the quality of saithe (Pollachius virens L.) attracted to fish farms?. Aquac Res.  2020; 51: 1720–1730. https://doi.org/10.1111/are.14519
+eff,Food ingestion efficiency,0.97,-,"Uglem I,  Toledo-Guedes K,  Sanchez-Jerez P,  Ulvan EM,  Evensen T,  Sæther BS.  Does waste feed from salmon farming affect the quality of saithe (Pollachius virens L.) attracted to fish farms?. Aquac Res.  2020; 51: 1720–1730. https://doi.org/10.1111/are.14519
 – range: 95-97% ingestion efficiency"
 ti,Integration start,day_1,-,
 tf,Integration end,day_730,-,

@@ -47,3 +47,10 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+
+#output plots
+data/atlantic_salmon/figures/outputs
+data/atlantic_salmon/data_products/model_ouputs
+
+

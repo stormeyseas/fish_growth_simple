@@ -734,7 +734,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     labs(x = "Production cycle (days)", y = "Ingestion (kg/day)")+
     guides(alpha = "none", fill = "none", colour = "none")+
     theme(text=element_text(size=8))+
-    scale_y_continuous(labels = \(label) label/1e+3, limits = c(0,9000000))
+    scale_y_continuous(labels = \(label) label/1e+3)
   
   
   ggsave(filename = file.path(Path, sprintf("figures/outputs/actual_ingestion_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
