@@ -338,7 +338,7 @@ ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
     
     # # Lowest feeding temperature threshold
     if (Temp[i]<Taa) {
-      ing=0
+      ing[i]=0
     }
     
     # reduced feeding at temps higher than optimal temp

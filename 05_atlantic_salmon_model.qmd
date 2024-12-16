@@ -69,7 +69,7 @@ farms_w_temp_df <-
 (missing_temp_farms <- farms_w_temp_df |> 
    filter(temp_c |> is.na()) |> pull(farm_id) |> unique())
 
-#how far apart in the sequence are the farms? If the previouys is incomplete we should be able to use the one before
+#how far apart in the sequence are the farms? If the previous is complete we should be able to use the one before in the same country
 diff(missing_temp_farms)
 
 
@@ -140,7 +140,7 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
 })
 
 
-
+#get th emean temps for each farm - this is needed to check which annual temps the fish can deal with
 mean_farm_temp <- 
   farm_list |> map_df(.f = \(x){
   data.frame(farm_id = unique(x$farm_id), 
@@ -150,7 +150,9 @@ mean_farm_temp <-
 })
 
 
-farms_to_omit <- mean_farm_temp |> filter(mean_temp<7) |> pull(farm_id)
+farms_to_omit <- mean_farm_temp |> filter(mean_temp<8.5) |> pull(farm_id)
+
+
 
 ```
 
@@ -169,7 +171,7 @@ farm_list <-
     
 
 #test 
-#this_farm <- farm_list[[40]]
+#this_farm <- farm_list[[41]]
 
 future::plan(strategy = "multisession", workers = parallel::detectCores()-2) #select core cluster
 
