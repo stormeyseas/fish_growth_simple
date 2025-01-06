@@ -35,3 +35,4 @@ ti,Integration start,day_1,-,
 tf,Integration end,day_730,-,
 IC,Initial condition on weight,See file 'Population.csv',,
 CS,Commercial size,4000,g,https://www.fao.org/fishery/affris/species-profiles/atlantic-salmon/growth/en/
+fcr,Food conversion ratio,1.2,,Aas et al 2021 

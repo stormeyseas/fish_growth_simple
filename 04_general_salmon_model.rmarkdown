@@ -4,7 +4,9 @@ format: html
 editor: visual
 ---
 
+
 Setup
+
 
 ```{r}
 library(tidyverse)
@@ -25,7 +27,9 @@ this_path <- sprintf(here("data/%s"), this_species)
 
 ```
 
+
 Prep temperature forcings for each farm site
+
 
 ```{r}
 
@@ -156,7 +160,9 @@ farms_to_omit <- mean_farm_temp |> filter(mean_temp<8.5) |> pull(farm_id)
 
 ```
 
+
 Run model for each location under reference feed.
+
 
 ```{r}
 
@@ -191,6 +197,4 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
 
 
 ```
-
-
 

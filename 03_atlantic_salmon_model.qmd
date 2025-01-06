@@ -171,7 +171,7 @@ farm_list <-
     
 
 #test 
-#this_farm <- farm_list[[41]]
+this_farm <- farm_list[[41]]
 
 future::plan(strategy = "multisession", workers = parallel::detectCores()-2) #select core cluster
 
@@ -191,6 +191,3 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
 
 
 ```
-
-
-

@@ -132,7 +132,7 @@ preprocess <- \(Path, Forcings, Feed_type, Stocking, Farm_id){
   Food <- read.csv(sprintf(file.path(Path, "forcings/Food_characterization_%s.csv"), Feed_type), sep = ",", header = FALSE)    # Reading the food composition (Proteins, Lipids, Carbohydrates) data
   
   # Extract parameters and forcing values from parameters matrix and convert to type 'double' the vector contents
-  Spp_param <-  as.matrix(Param_matrix[1:21,3])           # Vector containing all parameters
+  Spp_param <-  as.matrix(Param_matrix[c(1:21, 26),3])           # Vector containing all parameters
   Spp_param <-  suppressWarnings(as.numeric(Spp_param))
   Dates <- Param_matrix[22:23,3]                      # Vector containing the starting and ending date of the simulation
   #IC=as.double(as.matrix(Param_matrix[24,3]))        # Initial weight condition - hashed out for randomization in population model
@@ -281,6 +281,8 @@ ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
   a=Spp_param[19]            # [J/gtissue] Energy content of fish tissue
   k=Spp_param[20]            # [-] Weight exponent for energy content
   eff=Spp_param[21]          # [-] Food ingestion efficiency
+  fcr = Spp_param[26]
+  
   
   # Food composition definition
   Pcont=Food[1]       # [-] Percentage of proteins in the food
@@ -333,7 +335,7 @@ ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
     
     # Ingested mass
     ing[i]=ingmax*(weight[i]^m)*fgT[i]   # [g/d] Potential ingestion rate
-    resource[i] = 0.066*weight[i]^0.75 # this is taken from the salmon model
+    resource[i] = weight[i]*fcr #based on what Tom says he does in labs. This is ALex's  0.066*weight[i]^0.75 # this is taken from the salmon model
     G[i] = eff*resource[i]
     
     # # Lowest feeding temperature threshold
@@ -852,7 +854,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
   qsave(NH4_df, file = file.path(Path, sprintf("data_products/model_outputs/NH4_production_output_%s.qs", Farm_id)))
   qsave(resource_df, file = file.path(Path, sprintf("data_products/model_outputs/feed_available_output_%s.qs", Farm_id)))
   qsave(temp_f_df, file = file.path(Path, sprintf("data_products/model_outputs/temp_function_output_%s.qs", Farm_id)))
-  
+  qsave(daysToSize, file = file.path(Path, sprintf("data_products/model_outputs/days_to_size_output_%s.qs", Farm_id)))
 
 }
 

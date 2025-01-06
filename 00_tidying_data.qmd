@@ -197,19 +197,3 @@ map(.x = raw_SST_files, .f = \(this_file){
 
 
 ```
-
-
-Make some stocking density assumptions based on farm tonnage
-
-```{r}
-
-farm_info <- qread("data/_general_data/farm_locations/locations.qs")
-
-
-
-
-
-```
-
-
-
