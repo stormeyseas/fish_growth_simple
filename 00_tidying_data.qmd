@@ -73,16 +73,18 @@ Modify Feed characterisation and save to all species forcings
 
 ```{r}
 
+
 #import food characterisation data - this is calculated in an independent google drive document
 
+diet = "reference"
+
+
 Food_charactisation_list <- 
-  read_csv("data/_general_data/diets/protein_lipid_carb_summaries_diet.csv") |> 
+  read_csv(sprintf("data/_general_data/diets/protein_lipid_carb_summaries_%s.csv", diet)) |> 
   select(-c(5)) |> 
   pivot_longer(names_to = "nutrient", values_to = "prop", cols = -species) |> 
   group_by(species) |> 
   group_split()
-
-
 
 
 
@@ -97,9 +99,41 @@ map(.x = Food_charactisation_list, .f = \(this_species_food){
     mutate(prop = as.double(prop)) |> 
     select(-species)
   
-  write.table(this_species_food_df, file = sprintf("data/%s/forcings/Food_characterization.csv", this_species), row.names = FALSE, col.names = FALSE, sep = ",")
+  write.table(this_species_food_df, file = sprintf("data/%s/forcings/Food_characterization_%s.csv", this_species, diet), row.names = FALSE, col.names = FALSE, sep = ",")
 
 })
+
+
+#now repeat for future feed
+
+diet = "future"
+
+Food_charactisation_list <- 
+  read_csv(sprintf("data/_general_data/diets/protein_lipid_carb_summaries_%s.csv", diet)) |> 
+  pivot_longer(names_to = "nutrient", values_to = "prop", cols = -species) |> 
+  group_by(species) |> 
+  group_split()
+
+
+
+map(.x = Food_charactisation_list, .f = \(this_species_food){
+  
+  this_species <- this_species_food$species |> unique()
+  
+  this_species_food_df <- 
+    this_species_food |> 
+    relocate(prop, .before = "nutrient") |> 
+    mutate(nutrient = as.character(paste0(str_to_sentence(nutrient), "s"))) |> 
+    mutate(prop = as.double(prop)) |> 
+    select(-species)
+  
+  write.table(this_species_food_df, file = sprintf("data/%s/forcings/Food_characterization_%s.csv", this_species, diet), row.names = FALSE, col.names = FALSE, sep = ",")
+
+})
+
+
+
+
 
 
 

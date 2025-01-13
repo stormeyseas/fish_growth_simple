@@ -128,7 +128,7 @@ preprocess <- \(Path, Forcings, Feed_type, Stocking, Farm_id){
   
   
   # Read forcings and parameters from .csv files
-  Param_matrix <- read.csv(file.path(Path,"params/Parameters.csv"), sep = ",")           # Reading the matrix containing parameters and their description
+  Param_matrix <- read.csv(sprintf(file.path(Path,"params/Parameters_%s.csv"), Feed_type), sep = ",")           # Reading the matrix containing parameters and their description
   Food <- read.csv(sprintf(file.path(Path, "forcings/Food_characterization_%s.csv"), Feed_type), sep = ",", header = FALSE)    # Reading the food composition (Proteins, Lipids, Carbohydrates) data
   
   # Extract parameters and forcing values from parameters matrix and convert to type 'double' the vector contents
@@ -281,7 +281,7 @@ ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
   a=Spp_param[19]            # [J/gtissue] Energy content of fish tissue
   k=Spp_param[20]            # [-] Weight exponent for energy content
   eff=Spp_param[21]          # [-] Food ingestion efficiency
-  fcr = Spp_param[26]
+  fcr = Spp_param[22]
   
   
   # Food composition definition
@@ -335,7 +335,7 @@ ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
     
     # Ingested mass
     ing[i]=ingmax*(weight[i]^m)*fgT[i]   # [g/d] Potential ingestion rate
-    resource[i] = weight[i]*fcr #based on what Tom says he does in labs. This is ALex's  0.066*weight[i]^0.75 # this is taken from the salmon model
+    resource[i] = 0.066*weight[i]^0.75 #from Alex's code
     G[i] = eff*resource[i]
     
     # # Lowest feeding temperature threshold
@@ -369,7 +369,7 @@ ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
     # exc[i]=cbind(Pexc[i],Lexc[i],Cexc[i])        # Output with excretion values
     
     # Compute waste (this is uneaten feed only - does not include solid faecal matter)
-    Pwst[i]=((G[i]/eff)-ingvero[i])*Pcont     # Proteins to waste [g/d]
+    Pwst[i]=(resource[i]-ingvero[i])*Pcont     # Proteins to waste [g/d]
     Lwst[i]=((G[i]/eff)-ingvero[i])*Lcont     # Lipids to waste [g/d]
     Cwst[i]=((G[i]/eff)-ingvero[i])*Ccont     # Carbohydrates to waste [g/d]
     # wst[i]=cbind(Pwst[i],Cwst[i],Lwst[i])        # Output with waste values
