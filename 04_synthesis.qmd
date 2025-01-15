@@ -1,0 +1,96 @@
+---
+title: "Synthesising the model outputs"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(qs)
+library(sf)
+library(dtplyr)
+
+this_species <- "atlantic_salmon"
+
+```
+
+
+Bring in spatial file with farm IDs
+
+```{r}
+
+locations_file <- 
+  qread(file = sprintf("data/_general_data/farm_locations/%s_locations_w_temps.qs", this_species)) |> 
+  select(-c(day, temp_c)) |> 
+  group_by(farm_id) |> 
+  group_split() |> 
+  map_df(.f = \(x){return(x |> slice(1))})
+
+
+```
+
+We are primarily interested in biomass produced, excretion (ammonia), faeces, and wasted feed broken down to nitrogen
+
+```{r}
+
+
+biomass_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs"), pattern = "biomass_", full.names = TRUE)
+
+faeces_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs"), pattern = "excretion_", full.names = TRUE)
+
+feed_waste_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs"), pattern = "feed_waste_", full.names = TRUE)
+
+ammonia_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs"), pattern = "NH4_", full.names = TRUE)
+
+weight_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs"), pattern = "weight_", full.names = TRUE)
+
+
+```
+
+Loop through the locations file to add the biomass, excretion, faeces, uneaten feed in N.
+```{r}
+
+feed_type <-  "reference"
+
+commercial_size <- read.csv(sprintf(here("data/%s/params/Parameters_%s.csv"), this_species, feed_type)) |> filter(Description == "Commercial size") |> pull(Value) |> as.numeric()
+
+farm_ids <- locations_file$farm_id
+
+
+this_id <- farm_ids[[2]]
+
+
+map(.x = farm_ids, .f = \(this_id){
+  
+  weight_days <- qread(weight_files[grep(pattern = sprintf("farmID_%s.qs", this_id), weight_files)]) |> pull(days)
+  weights <- qread(weight_files[grep(pattern = sprintf("farmID_%s.qs", this_id), weight_files)]) |> pull(upper_bound)
+  
+  
+  harvest_day <- 
+    weight_days |> 
+    pluck(if(tail(weights, n=1)>commercial_size){
+      head(which(weights>commercial_size), n =1)
+    } else {
+      tail(weight_days, n=1)
+      } )
+    
+    
+
+  
+  
+  biomass_df <- qread(biomass_files[grep(pattern = sprintf("farmID_%s.qs", this_id), biomass_files)]) |> 
+    slice(harvest_day) |> pull(upper_bound)
+  
+  
+  
+  
+  
+})
+
+
+
+
+
+```
+
