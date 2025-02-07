@@ -49,9 +49,12 @@ po/*~
 rsconnect/
 
 
-#output plots
-data/atlantic_salmon/data_products
-data/atlantic_salmon/figures
+#atlantic salmon outputs 
+data/atlantic_salmon
+
+#general salmon outputs
+data/general_salmonid
+
 
 
 
