@@ -10,6 +10,8 @@ library(here)
 library(qs)
 library(sf)
 library(dtplyr)
+library(future)
+library(furrr)
 
 this_species <- "atlantic_salmon"
 
@@ -58,10 +60,18 @@ commercial_size <- read.csv(sprintf(here("data/%s/params/Parameters_%s.csv"), th
 farm_ids <- locations_file$farm_id
 
 
-this_id <- farm_ids[[2]]
+this_id <- farm_ids[[29]]
 
 
-map(.x = farm_ids, .f = \(this_id){
+#Set up multicore
+
+future::plan(strategy = "multisession", workers = parallel::detectCores()-2)
+
+farm_N_reference <- 
+  
+  future_map(.x = farm_ids, .f = \(this_id){
+    
+  message("Synthesising nitrogen data at harvest this farmID_", this_id)
   
   weight_days <- qread(weight_files[grep(pattern = sprintf("farmID_%s.qs", this_id), weight_files)]) |> pull(days)
   weights <- qread(weight_files[grep(pattern = sprintf("farmID_%s.qs", this_id), weight_files)]) |> pull(upper_bound)
@@ -69,24 +79,48 @@ map(.x = farm_ids, .f = \(this_id){
   
   harvest_day <- 
     weight_days |> 
-    pluck(if(tail(weights, n=1)>commercial_size){
-      head(which(weights>commercial_size), n =1)
+    pluck(if(tail(weights, n=2)[1]>commercial_size){
+      head(which(weights>commercial_size), n =2)[1]
     } else {
-      tail(weight_days, n=1)
+      tail(weight_days, n=2)[1]
       } )
     
-    
+  
+  this_biomass <- qread(biomass_files[grep(pattern = sprintf("farmID_%s.qs", this_id), biomass_files)]) |> 
+    slice(harvest_day) |> pull(upper_bound)/1e+6
+  
+  this_faeces <- qread(faeces_files[grep(pattern = sprintf("farmID_%s.qs", this_id), faeces_files)]) |> filter(nutrient == "Protein") |> slice(1:harvest_day) |> pull(upper_bound) |> sum()/6.25/1e+6
+  
+  this_feed_waste <- qread(feed_waste_files[grep(pattern = sprintf("farmID_%s.qs", this_id), feed_waste_files)])|> filter(nutrient == "Protein") |> slice(1:harvest_day) |> pull(upper_bound) |> sum()/6.25/1e+6
+  
+  this_ammonia <- qread(ammonia_files[grep(pattern = sprintf("farmID_%s.qs", this_id), ammonia_files)]) |> 
+    slice(1:harvest_day) |> pull(upper_bound) |> sum()/1e+6
+  
+  return(data.frame(location = paste("farmID_", this_id), biomass = this_biomass, faeces = this_faeces, excretion = this_ammonia, feed_waste = this_feed_waste, total_N = sum(this_faeces, this_ammonia, this_feed_waste)))
+  
+}) |> bind_rows() 
 
+
+
+
+
+```
+```{r}
+
+move_files <- \(thisfilename){
   
+  basepath = here("data/atlantic_salmon/data_products/model_outputs")
   
-  biomass_df <- qread(biomass_files[grep(pattern = sprintf("farmID_%s.qs", this_id), biomass_files)]) |> 
-    slice(harvest_day) |> pull(upper_bound)
+  new_filename = paste0(basepath, "/reference/", basename(thisfilename))
   
+  file.rename(from = thisfilename, to = new_filename)
   
-  
-  
-  
-})
+}
+
+future::plan(strategy = "multisession", workers = parallel::detectCores()-1)
+
+future_map(.x = list.files(here("data/atlantic_salmon/data_products/model_outputs"), pattern = "farmID_", full=TRUE),
+           .f = move_files)
 
 
 

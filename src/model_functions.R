@@ -490,7 +490,7 @@ loop <- function(Path, Pop_param, Spp_param, Temp, Food, times, N, Farm_id){
 
 
 
-post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
+post_process <- function(Path, Farm_id, Feed_type, out_loop, times, N, CS) {
   
   cat('Data post-processing\n')
   cat('\n')
@@ -587,7 +587,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     guides(alpha = "none", fill = "none", colour = "none")+
     theme(text=element_text(size=8))
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/weight_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/weight_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   
@@ -607,7 +607,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     theme(text=element_text(size=8))+
     scale_y_continuous(labels = \(label) label/1e+6)
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/biomass_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/biomass_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   
@@ -625,7 +625,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     guides(alpha = "none", fill = "none", colour = "none")+
     theme(text=element_text(size=8))
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/dw_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/dw_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   
@@ -644,7 +644,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     theme(text=element_text(size=8))
   
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/epistiss_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/epistiss_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   # plot excretion
@@ -681,7 +681,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
           legend.background = element_rect(fill="transparent"))+
     scale_y_continuous(labels = \(label) label/1e+3)
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/excretion_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/excretion_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   # plot wasted feed
@@ -718,7 +718,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     scale_y_continuous(labels = \(label) label/1e+3)
   
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/feed_waste_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/feed_waste_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   
@@ -739,7 +739,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     scale_y_continuous(labels = \(label) label/1e+3)
   
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/actual_ingestion_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/actual_ingestion_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   metab_df =  rbind(
@@ -759,7 +759,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
           legend.title = element_blank())+
     scale_y_continuous(labels = \(label) label/1e+3)
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/metabolic_rate_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/metabolic_rate_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   
@@ -778,7 +778,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
   
   
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/o2_consumption_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/o2_consumption_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   #plot ammonia
@@ -795,7 +795,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     theme(text=element_text(size=8))+
     scale_y_continuous(labels = \(labels) labels/1e+3)
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/nh4_production_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/nh4_production_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   resource_df = data.frame(days = days, feed_resource = Resource_stat[,1][-730], lower_bound = Resource_stat[,1][-730]-Resource_stat[,2][-730], upper_bound = Resource_stat[,1][-730]+Resource_stat[,2][-730])
@@ -810,7 +810,7 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
     theme(text=element_text(size=8))+
     scale_y_continuous(labels = \(labels) labels/1e+3, limits = c(0,9000000))
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/available_feed_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/available_feed_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   
@@ -837,24 +837,24 @@ post_process <- function(Path, Farm_id, out_loop, times, N, CS) {
           legend.title = element_blank())+
     scale_y_continuous(labels = \(label) label/1e+3)
   
-  ggsave(filename = file.path(Path, sprintf("figures/outputs/temp_function_%s.jpeg", Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
+  ggsave(filename = file.path(Path, sprintf("figures/outputs/%s/temp_function_%s.jpeg", Feed_type, Farm_id)), dpi = 150, width = 12, height = 8, units="cm")
   
   
   #save data
   
-  qsave(x= weight_df, file = file.path(Path, sprintf("data_products/model_outputs/weight_output_%s.qs", Farm_id)))
-  qsave(x = biomass_df, file = file.path(Path, sprintf("data_products/model_outputs/biomass_output_%s.qs", Farm_id)))
-  qsave(x = dw_df, file = file.path(Path, sprintf("data_products/model_outputs/dw_output_%s.qs", Farm_id)))
-  qsave(epistiss_df, file = file.path(Path, sprintf("data_products/model_outputs/epistiss_output_%s.qs", Farm_id)))
-  qsave(excretion_df, file = file.path(Path, sprintf("data_products/model_outputs/excretion_output_%s.qs", Farm_id)))
-  qsave(feed_waste_df, file = file.path(Path, sprintf("data_products/model_outputs/feed_waste_output_%s.qs", Farm_id)))
-  qsave(ingvero_df, file = file.path(Path, sprintf("data_products/model_outputs/ingvero_output_%s.qs", Farm_id)))
-  qsave(metab_df, file = file.path(Path, sprintf("data_products/model_outputs/metabolic_rate_output_%s.qs", Farm_id)))
-  qsave(O2_df, file = file.path(Path, sprintf("data_products/model_outputs/O2_consumption_output_%s.qs", Farm_id)))
-  qsave(NH4_df, file = file.path(Path, sprintf("data_products/model_outputs/NH4_production_output_%s.qs", Farm_id)))
-  qsave(resource_df, file = file.path(Path, sprintf("data_products/model_outputs/feed_available_output_%s.qs", Farm_id)))
-  qsave(temp_f_df, file = file.path(Path, sprintf("data_products/model_outputs/temp_function_output_%s.qs", Farm_id)))
-  qsave(daysToSize, file = file.path(Path, sprintf("data_products/model_outputs/days_to_size_output_%s.qs", Farm_id)))
+  qsave(x= weight_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/weight_output_%s.qs", Feed_type, Farm_id)))
+  qsave(x = biomass_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/biomass_output_%s.qs", Feed_type, Farm_id)))
+  qsave(x = dw_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/dw_output_%s.qs", Feed_type, Farm_id)))
+  qsave(epistiss_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/epistiss_output_%s.qs", Feed_type, Farm_id)))
+  qsave(excretion_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/excretion_output_%s.qs", Feed_type, Farm_id)))
+  qsave(feed_waste_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/feed_waste_output_%s.qs", Feed_type, Farm_id)))
+  qsave(ingvero_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/ingvero_output_%s.qs", Feed_type, Farm_id)))
+  qsave(metab_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/metabolic_rate_output_%s.qs", Feed_type, Farm_id)))
+  qsave(O2_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/O2_consumption_output_%s.qs", Feed_type, Farm_id)))
+  qsave(NH4_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/NH4_production_output_%s.qs", Feed_type, Farm_id)))
+  qsave(resource_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/feed_available_output_%s.qs", Feed_type, Farm_id)))
+  qsave(temp_f_df, file = file.path(Path, sprintf("data_products/model_outputs/%s/temp_function_output_%s.qs", Feed_type, Farm_id)))
+  qsave(daysToSize, file = file.path(Path, sprintf("data_products/model_outputs/%s/days_to_size_output_%s.qs", Feed_type, Farm_id)))
 
 }
 
@@ -883,7 +883,7 @@ model_run <- function(Path, Forcings, Feed_type, Stocking, Farm_id){
   out_loop <- loop(Path = Path, Spp_param = Spp_param, Pop_param = Pop_param, Temp = Temp, Food = Food, times = times, N = N, Farm_id = Farm_id)
   
   #plot and save model outputs
-  out_post <- post_process(Path = Path, Farm_id = Farm_id, out_loop = out_loop, times = times, N = N, CS = CS)
+  out_post <- post_process(Path = Path, Farm_id = Farm_id, Feed_type = Feed_type, out_loop = out_loop, times = times, N = N, CS = CS)
   
   return(out_post)
   
