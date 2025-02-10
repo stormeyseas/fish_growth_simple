@@ -192,7 +192,6 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
 
 ```
 
-
 Run model for each location under past feed
 
 ```{r}
@@ -224,7 +223,6 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
     
 
 ```
-
 
 Run model for each location under future feed
 
@@ -259,4 +257,3 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
     
 
 ```
-
