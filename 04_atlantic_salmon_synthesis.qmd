@@ -315,7 +315,7 @@ weight_files <- list.files(path = sprintf(here("data/atlantic_salmon/data_produc
 
 ```
 
-Past feeds - loop through the locations file to add the biomass, excretion, faeces, uneaten feed in N.
+Future feeds - loop through the locations file to add the biomass, excretion, faeces, uneaten feed in N.
 
 ```{r}
 
