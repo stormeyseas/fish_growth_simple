@@ -31,14 +31,11 @@ locations_file <-
 
 ```
 
-
 We are primarily interested in biomass produced, excretion (ammonia), faeces, and wasted feed broken down to nitrogen.
-
 
 REFERENCE FEED
 
 Bring in relevant model outputs.
-
 
 ```{r}
 
@@ -56,7 +53,6 @@ ammonia_files <- list.files(path = sprintf(here("data/atlantic_salmon/data_produ
 weight_files <- list.files(path = sprintf(here("data/atlantic_salmon/data_products/model_outputs/%s"), this_feed), pattern = "weight_", full.names = TRUE)
 
 
-file_check <- !file.exists(sprintf(here("data/atlantic_salmon/data_products/model_summaries/%s/nitrogen_summary.qs"), this_feed))
 
 ```
 
@@ -71,7 +67,7 @@ commercial_size <- read.csv(sprintf(here("data/%s/params/Parameters_%s.csv"), th
 farm_ids <- locations_file$farm_id
 
 
-this_id <- farm_ids[[29]]
+#this_id <- farm_ids[[29]]
 
 
 #Set up multicore
@@ -154,7 +150,7 @@ farm_N_reference_spatial <-
   locations_file |> 
   select(iso3c, country, tonnes_per_farm, geometry, farm_id) |> 
   distinct() |> 
-  left_join(farm_N_future)
+  left_join(farm_N_reference)
 
 
 
@@ -162,7 +158,6 @@ qsave(x = farm_N_reference_spatial, file =  sprintf(here("data/atlantic_salmon/d
 
 
 ```
-
 
 PAST FEEDS
 
@@ -283,7 +278,7 @@ farm_N_past_spatial <-
   locations_file |> 
   select(iso3c, country, tonnes_per_farm, geometry, farm_id) |> 
   distinct() |> 
-  left_join(farm_N_future)
+  left_join(farm_N_past)
 
 
 
@@ -291,11 +286,9 @@ qsave(x = farm_N_past_spatial, file =  sprintf(here("data/atlantic_salmon/data_p
 
 ```
 
-
 FUTURE FEEDS
 
 Bring in the relevant model outputs.
-
 
 ```{r}
 
@@ -422,7 +415,3 @@ qsave(x = farm_N_future_spatial, file =  sprintf(here("data/atlantic_salmon/data
 
 
 ```
-
-
-
-
