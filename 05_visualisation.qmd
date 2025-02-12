@@ -31,7 +31,6 @@ REFERENCE FEED: Nitrogen per tonne
 
 ```{r}
 
-
 reference_point_df<- qread(here("data/atlantic_salmon/data_products/model_summaries/reference/nitrogen_summary.qs")) |> 
   mutate(N_per_biomass_mean = total_N_mean/biomass_mean)
 
