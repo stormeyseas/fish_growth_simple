@@ -274,9 +274,9 @@ ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
   m=Spp_param[12]            # [-] Weight exponent for the anabolism
   n=Spp_param[13]            # [-] Weight exponent for the catabolism
   betac=Spp_param[14]        # [-]  Shape coefficient for the H(Tw) function
-  Tma=Spp_param[15]          # [Celsius degree] Maximum lethal temperature for Dicentrarchus labrax
-  Toa=Spp_param[16]          # [Celsius degree] Optimal temperature for Dicentrarchus labrax
-  Taa=Spp_param[17]          # [Celsius degree] Lowest feeding temperature for Dicentrarchus labrax
+  Tma=Spp_param[15]          # [Celsius degree] Maximum lethal temperature  
+  Toa=Spp_param[16]          # [Celsius degree] Optimal temperature
+  Taa=Spp_param[17]          # [Celsius degree] Lowest feeding temperature
   omega=Spp_param[18]        # [gO2/g] Oxygen consumption - weight loss ratio
   a=Spp_param[19]            # [J/gtissue] Energy content of fish tissue
   k=Spp_param[20]            # [-] Weight exponent for energy content
@@ -362,7 +362,7 @@ ind_equations <- function(Path, Pop_param, Spp_param, Temp, Food, times, N){
     diet = Pcont*epsprot*betaprot+Lcont*epslip*betalip+Ccont*epscarb*betacarb # [J/g] Energy content of the ingested food
     assE[i] = ingvero[i]*diet # [J/d] Ingested energy
     
-    # Compute excretion (not sure if this is actually dissolved inorganic nutrients)
+    # Compute excretion (faeces)
     Pexc[i] = (1-betaprot)*Pcont*ingvero[i]  # Excreted proteins [g/d]
     Lexc[i] = (1-betalip)*Lcont*ingvero[i]   # Excreted lipids [g/d]
     Cexc[i] = (1-betacarb)*Ccont*ingvero[i]  # Excreted carbohydrates [g/d]
