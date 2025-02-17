@@ -1,0 +1,19 @@
+---
+title: "05_species_layers"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(janitor)
+library(terra)
+library(sf)
+library(qs)
+library(countrycode)
+library(terra)
+
+source("src/dir.R")
+```
+
