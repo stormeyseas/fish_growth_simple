@@ -49,6 +49,9 @@ po/*~
 rsconnect/
 
 
+data/_general_data/species_layers
+
+
 #atlantic salmon outputs 
 data/atlantic_salmon
 

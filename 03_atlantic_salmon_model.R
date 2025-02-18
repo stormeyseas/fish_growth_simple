@@ -149,6 +149,12 @@ farms_to_omit <- mean_farm_temp |> filter(mean_temp<8.5) |> pull(farm_id)
 
 
 
+
+
+
+
+
+
 # STEP 2 - Run models usinf different feeds
 
 # Step 2a - Run model for each location under reference feed.
@@ -189,6 +195,12 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
 
 
 
+
+
+
+
+
+
 # STEP 2b - Run model for each location under past feed
 
 
@@ -216,6 +228,16 @@ furrr::future_map(.x = farm_list, .f = \(this_farm){
   
 },
 .options = furrr_options(seed = 123))
+
+
+
+
+
+
+
+
+
+
 
 
 

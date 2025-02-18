@@ -17,9 +17,13 @@ library(terra)
 source("src/dir.R")
 ```
 
-
+Pull in the species vulnerability data
 
 ```{r}
+
+
+
+
 
 ```
 
