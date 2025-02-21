@@ -13,17 +13,104 @@ library(sf)
 library(qs)
 library(countrycode)
 library(terra)
+library(stars)
+library(furrr)
 
 source("src/dir.R")
+source("src/spatial_templates.R")
 ```
 
 Pull in the species vulnerability data
 
 ```{r}
+full_vuln_df <- qread(file = here("data/_general_data/species_layers/vulnerabilities/marine_spp_vulnerabilities_eutrophication.qs"))
+
+```
+
+Determine which cells will be relevant for species layers to reduce the size necessary for aquamaps data.
+
+```{r}
+
+this_species <- "atlantic_salmon"
+
+salmon_locations <- qread(file = "data/_general_data/farm_locations/locations_w_species_fao_area_stocking.qs") |> filter(model_name == this_species) |> select(geometry, row_num)
+
+salmon_locations_transform <- st_transform(salmon_locations, crs = "ESRI:54016")
+
+salmon_farm_rast <- rasterize(x = salmon_locations_transform, y = gall_rast, field = "row_num", fun = "first")
 
 
+salmon_farm_df <- terra::as.data.frame(x= salmon_farm_rast, xy = TRUE) |> 
+  select(-first) |> 
+  left_join(terra::as.data.frame(x= gall_rast, xy = TRUE) |> rename(cell_id = lyr.1))
 
+
+cell_ids_for_farms <- salmon_farm_df$cell_id |> unique()
 
 
 ```
 
+#Now reproject all species rasters into the equal area (Gall) projection and then aggregate them again.
+
+Warning: this process uses a lot of memory and may stop and start if you have insufficient memory on your machine.
+
+```{r}
+aquamaps_0.5 <- qread(here("data/_general_data/species_layers/distribution/aquamaps_0.5d.qs"))
+
+aquamap_spp_list <- 
+  aquamaps_0.5 |> 
+  select(CenterLong, CenterLat, Probability, species) |> 
+  group_by(species) |> 
+  group_split()
+
+# remove the big file
+rm(aquamaps_0.5)
+
+#test function
+this_species_df <- aquamap_spp_list[[19072]]
+
+
+reproject_aquamaps_lyrs <- \(this_species_df){
+    
+  this_sp <- unique(this_species_df$species)
+  
+  save_name <- sprintf("data/_general_data/species_layers/reprojected_distributions/species_dist_gall_%s.qs", this_sp)
+  
+  if(!file.exists(save_name) & nrow(this_species_df)>2){
+    
+    message("Processing reprojection for ", this_sp)
+    
+    #create points from coords and transform to gall projection
+    this_sp_points <- st_as_sf(this_species_df, coords = c("CenterLong", "CenterLat"), crs = "EPSG:4326") |> st_transform(crs = "ESRI:54016")
+    
+    #specify resolution
+    target_res <- 10000
+    
+    #extent of points
+    this_sp_ext <- st_bbox(this_sp_points)
+    
+    #create blank grid in gall ext and resolution
+    this_blank_grid <- st_as_stars(this_sp_ext, dx = target_res, dy = target_res, values = this_sp_points$Probability , crs = "ESRI:54016")
+    
+    #rasterize over blank grid
+    this_spp_rast <- st_rasterize(this_sp_points, template = this_blank_grid)
+    
+    #convert
+    this_sp_gall_df <- as.data.frame(this_spp_rast, xy = TRUE) |> 
+      mutate(species = this_sp)
+    
+    qsave(x = this_sp_gall_df, file = save_name)
+    
+  }}
+
+  
+#multicore run for species  
+
+future::plan(strategy = "multisession", workers = parallel::detectCores()-2)
+
+future_map(.x = aquamap_spp_list, .f = reproject_aquamaps_lyrs)
+
+
+ aquamap_spp_list[[19760]]
+
+```

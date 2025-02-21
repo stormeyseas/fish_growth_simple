@@ -21,13 +21,9 @@ library(RColorBrewer)
 
 ```
 
-
 Rasterise reference feed data
 
-
 REFERENCE FEED: Nitrogen per tonne
-
-
 
 ```{r}
 
@@ -176,7 +172,6 @@ future_hist <- ggplot()+
 
 ```
 
-
 PLotting: Nitrogen per tonne
 
 ```{r}
@@ -206,9 +201,6 @@ hists <- reference_hist /
 ggsave(filename = here("explore/cottrell_explore/N_per_tonne_all_feeds_hist.jpg"), dpi = 300, device = "jpg", width = 5, height =9)
 
 ```
-
-
-
 
 REFERENCE FEED: Total nitrogen
 
@@ -389,11 +381,3 @@ hists <- reference_hist /
 ggsave(filename = here("explore/cottrell_explore/total_N_all_feeds_hist.jpg"), dpi = 300, device = "jpg", width = 5, height =9)
 
 ```
-
-
-
-
-
-
-
-

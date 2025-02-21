@@ -33,6 +33,7 @@ species <- c("atlantic_salmon",
              "milkfish")
 
 
+source(here("src/spatial_templates.R"))
 
 ```
 
@@ -259,8 +260,7 @@ map(.x = raw_SST_files, .f = \(this_file){
 
 ```
 
-
-Pull in spp vulnerability to eutrophication data  - save to salmon folder
+Pull in spp vulnerability to eutrophication data - save to salmon folder
 
 ```{r}
 
@@ -285,22 +285,18 @@ qsave(x = full_vuln_df, file = here("data/_general_data/species_layers/vulnerabi
 ```
 
 Pull in spp distribution data from Aquamaps
+
 ```{r}
 
-base_rast <- rast(crs = "EPSG:4326", ext = c(-180,180, -90, 90), res = 0.5)
-values(base_rast) <- 1:ncell(base_rast)
-
-cell_id <- terra::as.data.frame(base_rast, xy=TRUE) |> rename(cell_id = lyr.1, CenterLong = x ,  CenterLat = y)
 
 
-aquamaps_0.5d <- data.table::fread(file.path(rdsi_data_dir, "aquamaps/aquamaps_0.6_depth_prepped.csv")) |> left_join(cell_id)
+aquamaps_0.5d <- data.table::fread(file.path(rdsi_data_dir, "aquamaps/aquamaps_0.6_depth_prepped.csv")) 
 
 #all cells have an id. These id's can be used to isolate only the cells of relevance for the salmon farming locations.
 filter(aquamaps_0.5d, is.na(cell_id))
 
 #save to project
-qsave(x = aquamaps_0.5d, file = here("data/_general_data/species_layers/distribution/aquamaps_0.5d_w_id.qs"))
+qsave(x = aquamaps_0.5d, file = here("data/_general_data/species_layers/distribution/aquamaps_0.5d.qs"))
 
 
 ```
-

@@ -341,7 +341,6 @@ map_spp_to_locations <- bind_rows(lapply(map_spp_to_locations_list, FUN = functi
 qsave(x = map_spp_to_locations, file = here("data/_general_data/farm_locations/locations_w_species_fao_area.qs"))
 ```
 
-
 Stocking densities from the tonnage per farm and harvest size.
 
 ```{r}
@@ -366,4 +365,3 @@ farms_w_stocking <-
 qsave(x = farms_w_stocking, file =  "data/_general_data/farm_locations/locations_w_species_fao_area_stocking.qs")
 
 ```
-
