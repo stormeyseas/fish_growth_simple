@@ -295,6 +295,7 @@ aquamaps_0.5d <- data.table::fread(file.path(rdsi_data_dir, "aquamaps/aquamaps_0
 #all cells have an id. These id's can be used to isolate only the cells of relevance for the salmon farming locations.
 filter(aquamaps_0.5d, is.na(cell_id))
 
+
 #save to project
 qsave(x = aquamaps_0.5d, file = here("data/_general_data/species_layers/distribution/aquamaps_0.5d.qs"))
 

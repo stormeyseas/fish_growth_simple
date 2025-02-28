@@ -19,6 +19,8 @@ library(future)
 library(furrr)
 library(RColorBrewer)
 
+source("src/spatial_templates.R")
+
 ```
 
 Rasterise reference feed data
@@ -379,5 +381,83 @@ hists <- reference_hist /
   
 
 ggsave(filename = here("explore/cottrell_explore/total_N_all_feeds_hist.jpg"), dpi = 300, device = "jpg", width = 5, height =9)
+
+```
+
+
+#SPECIES IMPACTS
+
+
+```{r}
+
+east_canada_sp_impact <- qread("data/atlantic_salmon/data_products/spatial_summaries/all_regions.qs") |> filter(region == "East Canada") |> group_by(x,y) |> summarise(mean_impact = mean(impact, na.rm =TRUE))
+
+
+ggplot()+
+  geom_tile(data = east_canada_sp_impact, 
+            aes(x = x, y = y, fill = mean_impact))+
+  geom_sf(data = ne_countries(scale="medium", returnclass = "sf") |> st_crop(east_canada_bbox))+
+  scale_fill_gradientn(colours = c("yellow", "orange", "red"))
+  
+
+ggsave("explore/cottrell_explore/east_canada_spp_impact.jpg", device= "jpg", dpi=300, width = 20, height = 10, units="cm")
+
+
+
+west_canada_sp_impact <- qread("data/atlantic_salmon/data_products/spatial_summaries/all_regions.qs") |> filter(region == "West Canada") |> group_by(x,y) |> summarise(mean_impact = mean(impact, na.rm =TRUE))
+
+
+ggplot()+
+  geom_tile(data = west_canada_sp_impact, 
+            aes(x = x, y = y, fill = mean_impact))+
+  geom_sf(data = ne_countries(scale="medium", returnclass = "sf") |> st_crop(west_canada_bbox))+
+  scale_fill_gradientn(colours = c("yellow", "orange", "red"))
+  
+ggsave("explore/cottrell_explore/west_canada_spp_impact.jpg", device= "jpg", dpi=300, width = 15, height = 10, units="cm")
+
+
+europe_iceland_sp_impact <- qread("data/atlantic_salmon/data_products/spatial_summaries/all_regions.qs") |> filter(region == "Europe & Iceland") |> group_by(x,y) |> summarise(mean_impact = mean(impact, na.rm =TRUE))
+
+
+
+ggplot()+
+  geom_tile(data = europe_iceland_sp_impact, 
+            aes(x = x, y = y, fill = mean_impact))+
+  geom_sf(data = ne_countries(scale=50, returnclass = "sf", continent = "Europe") |> st_crop(europe_iceland_bbox), fill = "grey70")+
+  scale_fill_gradientn(colours = c("yellow", "orange", "red"))
+  
+
+ggsave("explore/cottrell_explore/europe_iceland_spp_impact.jpg", device= "jpg", dpi=300, width = 17, height = 10, units="cm")
+
+
+
+
+chile_sp_impact <- qread("data/atlantic_salmon/data_products/spatial_summaries/all_regions.qs") |> filter(region == "Chile") |> group_by(x,y) |> summarise(mean_impact = mean(impact, na.rm =TRUE))
+
+
+
+ggplot()+
+  geom_tile(data = chile_sp_impact, 
+            aes(x = x, y = y, fill = mean_impact))+
+  geom_sf(data = ne_countries(scale=50, returnclass = "sf") |> st_crop(chile_bbox), fill = "grey70")+
+  scale_fill_gradientn(colours = c("yellow", "orange", "red"))
+  
+ggsave("explore/cottrell_explore/chile_spp_impact.jpg", device= "jpg", dpi=300, width = 12, height = 16, units="cm")
+
+
+
+aus_sp_impact <- qread("data/atlantic_salmon/data_products/spatial_summaries/all_regions.qs") |> filter(region == "Australia") |> group_by(x,y) |> summarise(mean_impact = mean(impact, na.rm =TRUE))
+
+
+
+ggplot()+
+  geom_tile(data = aus_sp_impact, 
+            aes(x = x, y = y, fill = mean_impact))+
+  geom_sf(data = ne_countries(scale=50, returnclass = "sf") |> st_crop(australia_bbox), fill = "grey70")+
+  scale_fill_gradientn(colours = c("yellow", "orange", "red"))+
+  theme_bw()
+  
+ggsave("explore/cottrell_explore/tas_spp_impact.jpg", device= "jpg", dpi=300, width = 17, height = 10, units="cm")
+
 
 ```
