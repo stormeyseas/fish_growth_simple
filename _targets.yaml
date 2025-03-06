@@ -1,0 +1,6 @@
+
+project_main:
+  script: targets/_targets.R
+  store: targets/_targets
+  
+
