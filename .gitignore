@@ -38,6 +38,7 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+.Rprofile
 
 # pkgdown site
 docs/
@@ -57,6 +58,8 @@ data/atlantic_salmon
 
 #general salmon outputs
 data/general_salmonid
+
+
 
 
 
