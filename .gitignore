@@ -53,15 +53,10 @@ rsconnect/
 data/_general_data/species_layers
 
 
-#atlantic salmon outputs 
+# Atlantic salmon parameters 
 data/atlantic_salmon
 
-#general salmon outputs
-data/general_salmonid
-
-
-
-
-
-
+# Processed outputs
+data_processed/example_individual
+data_processed/farm_growth
 

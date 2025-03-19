@@ -1,10 +1,17 @@
 ---
 title: "05_visualisation"
 format: html
-editor: visual
+editor: source
+
+execute:
+  eval: false
+  echo: false
+  warning: false
+  message: false
+  cache: true
 ---
 
-```{r}
+```{r setup, eval=T, cache=T}
 library(tidyverse)
 library(here)
 library(ggpubr)
@@ -20,7 +27,6 @@ library(furrr)
 library(RColorBrewer)
 
 source("src/spatial_templates.R")
-
 ```
 
 Rasterise reference feed data
@@ -384,9 +390,7 @@ ggsave(filename = here("explore/cottrell_explore/total_N_all_feeds_hist.jpg"), d
 
 ```
 
-
 #SPECIES IMPACTS
-
 
 ```{r}
 

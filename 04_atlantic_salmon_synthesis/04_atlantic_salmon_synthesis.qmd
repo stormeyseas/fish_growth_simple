@@ -31,8 +31,6 @@ conflicts_prefer(dplyr::filter(), dplyr::select())
 this_species <- "atlantic_salmon"
 ```
 
-
-
 ```{r locations files}
 #| code-summary: Bring in spatial file with farm IDs
 
@@ -58,15 +56,15 @@ Bring in relevant model outputs.
 ```{r}
 this_feed <- "reference"
 
-biomass_files <- list.files(path = sprintf(here("data/atlantic_salmon/data_products/model_outputs/%s"), this_feed), pattern = "biomass_", full.names = TRUE)
+biomass_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs/"), pattern = "biomass_", full.names = TRUE)
 
-faeces_files <- list.files(path = sprintf(here("data/atlantic_salmon/data_products/model_outputs/%s"), this_feed), pattern = "excretion_", full.names = TRUE)
+faeces_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs/"), pattern = "excretion_", full.names = TRUE)
 
-feed_waste_files <- list.files(path = sprintf(here("data/atlantic_salmon/data_products/model_outputs/%s"), this_feed), pattern = "feed_waste_", full.names = TRUE)
+feed_waste_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs/"), pattern = "feed_waste_", full.names = TRUE)
 
-ammonia_files <- list.files(path = sprintf(here("data/atlantic_salmon/data_products/model_outputs/%s"), this_feed), pattern = "NH4_", full.names = TRUE)
+ammonia_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs/"), pattern = "NH4_", full.names = TRUE)
 
-weight_files <- list.files(path = sprintf(here("data/atlantic_salmon/data_products/model_outputs/%s"), this_feed), pattern = "weight_", full.names = TRUE)
+weight_files <- list.files(path = here("data/atlantic_salmon/data_products/model_outputs/"), pattern = "weight_", full.names = TRUE)
 ```
 
 Reference feeds - loop through the locations file to add the biomass, excretion, faeces, uneaten feed in N.
