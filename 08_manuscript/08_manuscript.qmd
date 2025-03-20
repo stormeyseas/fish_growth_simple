@@ -1,0 +1,164 @@
+---
+title: "Local to global N input modelling"
+date: last-modified
+author:
+  - name: Tormey Reimer
+    orcid: 0000-0002-5983-2798
+    corresponding: true
+    email: tormey.reimer@utas.edu.au
+    role: 
+      - conceptualization: lead
+      - methodology: lead
+      - analysis: lead
+      - drafting: lead
+    affil-id: [1,2]
+  - name: Catriona K. MacLeod
+    # orcid: 
+    corresponding: false
+    roles: 
+      - conceptualization: supporting
+      - drafting: supporting
+    affil-id: [1,2]
+  - name: Scott A. Hadley
+    # orcid: 
+    corresponding: false
+    roles: 
+      - conceptualization: supporting
+      - analysis: supporting
+    affil-id: 1
+  - name: Karen A. Alexander
+    orcid: 0000-0001-8801-413X
+    corresponding: false
+    roles: 
+      - conceptualization: supporting
+      - drafting: supporting
+    affil-id: [3,2]
+affiliations:
+  - id: 1
+    name: Institute for Marine and Antarctic Studies, University of Tasmania
+    group: Fisheries & Aquaculture
+    address: 29 Nubeena Crescent
+    city: Taroona
+    region: TAS
+    country: Australia
+    postal-code: 7053
+    url: https://www.imas.utas.edu.au/
+  - id: 2
+    name: Centre for Marine Socioecology
+    url: https://marinesocioecology.org/
+  - id: 3
+    name: Heriott-Watt University, Institute for Life and Earth Sciences
+    department: School of Energy, Geoscience, Infrastructure and Society
+    address: Franklin Road
+    city: Stromness
+    region: Orkney
+    country: United Kingdom
+    postal-code: KW16 3AN
+    url: https://www.hw.ac.uk/
+keywords:
+  - keyword
+  - keyword
+abstract: |
+  Any new aquaculture venture must consider its potential as a biosecurity risk to native populations. 
+  Where such issues exist an important consideration may be the ability to inﬂuence or change the routes by which pathogenic particles can propagate. 
+  This is especially important i) for siting cultures of native macroalgae, which may affect local populations and ii) in IMTA, where macroalgae must be sited near salmon pens. 
+  Using a calibrated hydrodynamic particle tracking tool, we investigate the realistic potential placement of macroalgae farms and how they affect the connectivity of an entire estuary. By characterising a heavily cultivated estuary according to several measures representing risk, we develop new conﬁgurations of farm sites designed to reduce the risk to wild populations. 
+  While targeted site selection can reduce risk by altering the average risk of farm sites in the network, farm sites overall have relatively less inﬂuence on the connectivity of the whole system than wild sites. 
+  Furthermore, reducing risk by one measure can increase risk by another measure if particles remain viable for >24 hours. Particle viability is a major determinant in the types of risk present, with a 24-hour lifespan leading to markedly different outcomes than any lifespan >1 week. Connectivity analysis is a powerful tool for risk assessment and mitigation, and for optimising regulation and monitoring by identifying sites where monitoring could be most effective.
+  However, there is no one measure that adequately encompasses all risk and managers must assess trade-offs according to the particle(s) and types of risk being considered.
+plain-language-summary: |
+  Plain language summary goes here....
+key-points:
+  - Point 1
+  - Point 2
+# citation:
+#   container-title: Earth and Space Science
+bibliography: ["../resources/refs.bib", "../resources/manual-refs.bib"]
+
+format: 
+  html:
+    theme: simplex
+    css: ["../resources/extra.css"]
+    code-fold: true
+    code-overflow: wrap
+    toc: true
+    toc-expand: true
+    toc-location: left
+    toc-depth: 4
+    lang: en-GB
+    grid:
+      sidebar-width: 400px
+      body-width: 1200px
+      margin-width: 100px
+      gutter-width: 2em
+  # pdf: 
+  #   papersize: a4
+  #   linestretch: 1.35
+  #   link-citations: true
+  #   keep-tex: true
+  #   template-partials:
+  #     - title.tex
+  #   include-in-header:
+  #     file: header_extra.tex
+
+filters:
+  - acronyms
+  
+execute:
+  eval: true
+  echo: false
+  warning: false
+  message: false
+  cache: true
+  
+knitr: 
+  opts_chunk:
+    fig.align: center
+---
+
+```{r setup}
+#| include: false
+#| cache: false
+#| eval: true
+
+library(magrittr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(here)
+library(ggpubr)
+library(patchwork)
+library(qs)
+library(arrow)
+library(targets)
+library(sf)
+library(terra)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(dtplyr)
+library(furrr)
+library(RColorBrewer)
+library(purrr)
+library(future)
+library(readxl)
+library(units)
+library(conflicted)
+library(lubridate)
+conflicts_prefer(dplyr::select(), dplyr::filter(), dplyr::intersect(), .quiet = T)
+# This markdown uses TinyTex - install with tinytex::install_tinytex()
+
+
+```
+
+# Statistical analysis
+
+All analysis was conducted in R version `r R.version[['minor']]` "`r R.version[['nickname']]`". 
+
+# Code availability
+
+This manuscript was written in Quarto [@quarto] using TinyTex [@tinytex] and the acronyms extension [@acronyms]. 
+For a full list of packages R, used see the [lockfile](https://www.github.com).
+
+
+

@@ -1,47 +1,44 @@
 ---
-title: "05_visualisation"
+title: "Model inner workings - for methods and supplementary sections"
 format: html
 editor: source
 
 execute:
-  eval: false
+  eval: true
   echo: false
   warning: false
   message: false
   cache: true
 ---
 
-```{r setup, eval=T, cache=T}
-# library(tidyverse)
-library(magrittr)
-library(dplyr)
-library(tidyr)
-library(stringr)
-library(ggplot2)
-library(here)
-library(ggpubr)
-library(patchwork)
-library(qs)
-library(arrow)
-library(targets)
-library(sf)
-library(terra)
-library(rnaturalearth)
-library(rnaturalearthdata)
-library(dtplyr)
-library(furrr)
-library(RColorBrewer)
+```{r setup}
+#| include: false
+#| cache: false
+#| eval: true
+
+packs <- unique(c('magrittr', 'dplyr', 'tidyr', 'stringr', 'ggplot2', 'here', 'ggpubr', 'patchwork', 'qs', 'arrow', 'targets', 'sf', 'terra', 'rnaturalearth', 'rnaturalearthdata', 'dtplyr', 'furrr', 'RColorBrewer'))
+pacman::p_load(char = packs)
+
+conflicts_prefer(dplyr::select(), dplyr::filter(), .quiet = T)
 
 source(here("src/spatial_templates.R"))
 source(here("src/model_functions.R"))
 Sys.setenv(TAR_PROJECT = "project_main")
+species_params <- tar_read(species_params)
 ```
 
 # Water temp
 
+```{r fig-water-temperature}
+sst <- file.path("data", "_general_data", "SST", "farm_SST_extracted.parquet") %>% read_parquet()
+sst_means <- sst %>% 
+  group_by(farm_id) %>% 
+  reframe(sst = mean(temp_c, na.rm = T))
+```
+
 # General fish functions
 
-```{r function response to temperature}
+```{r fig-functional-response-to-temperature}
 df <- data.frame(water_temp = seq(-5, 30, 0.25))
 df$resp <- exp(species_params['pk']*df$water_temp)
 
@@ -49,12 +46,13 @@ df %>%
   ggplot(aes(x = water_temp, y = resp)) +
   geom_line(linewidth = 0.75) +
   scale_y_continuous(breaks = seq(0,5,0.5)) +
-  labs(x = "Water temperature", y = "Temperature response") +
+  scale_x_continuous(breaks = seq(-10,35,5)) +
+  labs(x = expression("Water temperature ("*degree*"C)"), y = "Temperature response") +
   theme_classic() +
   theme(text = element_text(colour = "black", family = "serif", size = 12))
 ```
 
-```{r feeding rate}
+```{r fig-feeding-rate-with-temperature}
 df <- data.frame(water_temp = seq(-5, 30, 0.25))
 df$feeding <- sapply(FUN = feeding_rate, X = df$water_temp, species_params = species_params)
 
@@ -65,86 +63,120 @@ df %>%
   geom_vline(aes(xintercept = species_params["Taa"]), linetype = "dotted") +
   geom_vline(aes(xintercept = species_params["Tma"]), linetype = "dotted") +
   scale_y_continuous(breaks = seq(0,1,0.1)) +
-  labs(x = "Water temperature", y = "Relative feeding rate") +
+  labs(x = expression("Water temperature ("*degree*"C)"), y = "Relative feeding rate") +
   theme_classic() +
   theme(text = element_text(colour = "black", family = "serif", size = 12))
 ```
 
+## Food provision/eating
+
+Fixed the feeding so the fish are given 1-3% more food than needed, unless their feeding drops below 10%, at which point they’re given 25% of maintenance requirements by weight – results in about 4-6% uneaten feed. 
+
+```{r fig-food-provision}
+food_prov <- tar_read(exind_food_prov)
+ing_pot <- tar_read(exind_ing_pot)
+ing_act <- tar_read(exind_ing_act)
+weight <- tar_read(exind_weight)
+
+food_prov2 <- sapply(X = df$ing_pot, FUN = food_prov_rate, rel_feeding = 0.5, weight = 10)
+
+for (i in 1:length(food_prov)) {
+  df_1 <- food_prov[i] %>% read_parquet() %>% pivot_wider(names_from = "output", values_from = "value")
+  df_2 <- ing_pot[i] %>% read_parquet() %>% pivot_wider(names_from = "output", values_from = "value")
+  df_3 <- ing_act[i] %>% read_parquet() %>% pivot_wider(names_from = "output", values_from = "value")
+  df <- df_1 %>% 
+    merge(df_2, by = c("farm_ID", "feed", "days")) %>% 
+    merge(df_3, by = c("farm_ID", "feed", "days"))
+}
+
+ggplot(df, aes(x = ing_pot, y = food_prov, colour = feed)) +
+  geom_point()
+ggplot(df, aes(x = ing_pot, y = (food_prov-ing_pot)/ing_pot, colour = feed)) +
+  geom_point()
+```
+
+```{r fig-food-uneaten}
+
+
+```
+
 # Feed data
 
-```{r targets-data}
-species_params <- tar_read(species_params)
+Incorporated the individual digestibility of each ingredient and switched to tracking ingredients separately instead of feed – this unfortunately makes the model MUCH slower but I think it will be worth it once the digestibility coefficients from the experiments are incorporated.
 
+```{r feed-data}
 ref_feed <- list(
     feed_params_protein <- tar_read(feed_params_protein, branches = 1) %>% 
-      mutate(feed = "reference") %>% 
-      group_by(feed) %>% 
+      mutate(feed = "reference") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_protein = sum(feed_protein),
-              feed_protein_digestibility = sum(feed_protein_digestibility))
+              feed_protein_digestibility = sum(feed_protein_digestibility)),
   feed_params_carbs <- tar_read(feed_params_carbs, branches = 1) %>% 
-      mutate(feed = "reference") %>% 
-      group_by(feed) %>% 
+      mutate(feed = "reference") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_carb = sum(feed_carb),
-              feed_carb_digestibility = sum(feed_carb_digestibility))
+              feed_carb_digestibility = sum(feed_carb_digestibility)),
   feed_params_lipids <- tar_read(feed_params_lipids, branches = 1) %>% 
-      mutate(feed = "reference") %>% 
-      group_by(feed) %>% 
+      mutate(feed = "reference") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_lipid = sum(feed_lipid),
               feed_lipid_digestibility = sum(feed_lipid_digestibility))
 )
 past_feed <- list(
-    feed_params_protein <- tar_read(feed_params_protein, branches = 1) %>% 
-      mutate(feed = "past") %>% 
-      group_by(feed) %>% 
+    feed_params_protein <- tar_read(feed_params_protein, branches = 2) %>% 
+      mutate(feed = "past") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_protein = sum(feed_protein),
-              feed_protein_digestibility = sum(feed_protein_digestibility))
-  feed_params_carbs <- tar_read(feed_params_carbs, branches = 1) %>% 
-      mutate(feed = "past") %>% 
-      group_by(feed) %>% 
+              feed_protein_digestibility = sum(feed_protein_digestibility)),
+  feed_params_carbs <- tar_read(feed_params_carbs, branches = 2) %>% 
+      mutate(feed = "past") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_carb = sum(feed_carb),
-              feed_carb_digestibility = sum(feed_carb_digestibility))
-  feed_params_lipids <- tar_read(feed_params_lipids, branches = 1) %>% 
-      mutate(feed = "past") %>% 
-      group_by(feed) %>% 
+              feed_carb_digestibility = sum(feed_carb_digestibility)),
+  feed_params_lipids <- tar_read(feed_params_lipids, branches = 2) %>% 
+      mutate(feed = "past") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_lipid = sum(feed_lipid),
               feed_lipid_digestibility = sum(feed_lipid_digestibility))
 )
 fut_feed <- list(
-    feed_params_protein <- tar_read(feed_params_protein, branches = 1) %>% 
-      mutate(feed = "future") %>% 
-      group_by(feed) %>% 
+    feed_params_protein <- tar_read(feed_params_protein, branches = 3) %>% 
+      mutate(feed = "future") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_protein = sum(feed_protein),
-              feed_protein_digestibility = sum(feed_protein_digestibility))
-  feed_params_carbs <- tar_read(feed_params_carbs, branches = 1) %>% 
-      mutate(feed = "future") %>% 
-      group_by(feed) %>% 
+              feed_protein_digestibility = sum(feed_protein_digestibility)),
+  feed_params_carbs <- tar_read(feed_params_carbs, branches = 3) %>% 
+      mutate(feed = "future") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_carb = sum(feed_carb),
-              feed_carb_digestibility = sum(feed_carb_digestibility))
-  feed_params_lipids <- tar_read(feed_params_lipids, branches = 1) %>% 
-      mutate(feed = "future") %>% 
-      group_by(feed) %>% 
+              feed_carb_digestibility = sum(feed_carb_digestibility)),
+  feed_params_lipids <- tar_read(feed_params_lipids, branches = 3) %>% 
+      mutate(feed = "future") %>% group_by(feed) %>% 
       reframe(proportion = sum(proportion),
               feed_lipid = sum(feed_lipid),
               feed_lipid_digestibility = sum(feed_lipid_digestibility))
 )
 ```
 
-```{r comparing-feeds}
+```{r fig-compare-feeds-composition}
 
 
 ```
 
-# Finish off farm data
+```{r fig-compare-feeds-digestibility}
+
+
+```
+
+# Individual growth
+
+Set up some “example fish” to speed up future model adjustments – basically fish that are the average of their whole farm, easier than running 5000 fish per farm while I’m making quick changes.
 
 ```{r straight from targets}
 
 ```
+
+## Sensitivity to parameter changes
+
+In the process of using the example fish to run some sensitivity analysis – ie how much of an effect does changing each parameter ±10% have.
 
