@@ -8,3 +8,9 @@ deltaImax,Ingestion rate standard deviation,0.005,g/ gfish d,Took the rounded sd
 Nseed,Number of seeded individuals,,-,,see locations file - depends on the farm level production because we are modelling farms not cages
 mortmyt,natural mortality rate,0.00041,1/d,Tvete et al. 2023 https://doi.org/10.1016/j.prevetmed.2022.105798,
 nruns,number of simulations,5000,,,
+,,,,,
+,,,,,
+,,,,,
+,,,,,
+,,,,,
+,,,,,
