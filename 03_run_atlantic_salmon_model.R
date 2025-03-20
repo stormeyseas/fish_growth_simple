@@ -20,6 +20,7 @@ conflicts_prefer(dplyr::select(), dplyr::filter(), .quiet = T)
 
 # functions
 source("src/model_functions.R")
+fixnum <- function(n, digits = 4) {str_flatten(c(rep("0", digits-nchar(as.character(n))), as.character(n)))}
 
 # species paths
 this_species <- "atlantic_salmon"
@@ -118,27 +119,27 @@ farms_to_omit <- mean_farm_temp %>%
 
 
 # STEP 2 - Run model ----------------------------------------------------------------------------------------------
-Sys.setenv(TAR_PROJECT = "project_main")
-tar_make(reporter = "summary", seconds_meta_append = 120)
-
 ## Example individuals --------------------------------------------------------------------------------------------
+Sys.setenv(TAR_PROJECT = "project_main")
+tar_make(names = contains(c("exind")), reporter = "summary", seconds_meta_append = 300)
+
 farm_IDs <- tar_read(farm_IDs)
 nms <- c("weight", "dw", "water_temp", "T_response", "P_excr", "L_excr", "C_excr", "P_uneat", "L_uneat", "C_uneat", "food_prov", "food_enc", "rel_feeding", "ing_pot", "ing_act", "E_assim", "E_somat", "anab", "catab", "O2", "NH4", "SGR")
 
 overwrite <- F
 
 for (f in 1:length(farm_IDs)) {
+  df_1 <- tar_read(example_individual, branches = f) %>% as.data.frame()
+  df_2 <- tar_read(example_individual, branches = length(farm_IDs) + f) %>% as.data.frame()
+  df_3 <- tar_read(example_individual, branches = 2*length(farm_IDs) + f) %>% as.data.frame()
+  df_1$SGR <- 100 * (exp((log(df_1$weight)-log(df_1$weight[1]))/(df_1$days-df_1$days[1])) - 1)
+  df_2$SGR <- 100 * (exp((log(df_2$weight)-log(df_2$weight[1]))/(df_2$days-df_2$days[1])) - 1)
+  df_3$SGR <- 100 * (exp((log(df_3$weight)-log(df_3$weight[1]))/(df_3$days-df_3$days[1])) - 1)
+  feed_types <- tar_read(feed_types)
+  
   for (i in 1:length(nms)) {
     fname <- file.path("data_processed", "example_individual", "raw", str_c("farmID_", fixnum(farm_IDs[f]), "_", nms[i], ".parquet"))
     if (overwrite == T | !file.exists(fname)) {
-      df_1 <- tar_read(example_individual, branches = f) %>% as.data.frame()
-      df_2 <- tar_read(example_individual, branches = length(farm_IDs) + f) %>% as.data.frame()
-      df_3 <- tar_read(example_individual, branches = 2*length(farm_IDs) + f) %>% as.data.frame()
-      df_1$SGR <- 100 * (exp((log(df_1$weight)-log(df_1$weight[1]))/(df_1$days-df_1$days[1])) - 1)
-      df_2$SGR <- 100 * (exp((log(df_2$weight)-log(df_2$weight[1]))/(df_2$days-df_2$days[1])) - 1)
-      df_3$SGR <- 100 * (exp((log(df_3$weight)-log(df_3$weight[1]))/(df_3$days-df_3$days[1])) - 1)
-      feed_types <- tar_read(feed_types)
-    
       data.frame(
         days = df_1[ ,1],
         reference = df_1[ ,nms[i]],
@@ -151,17 +152,19 @@ for (f in 1:length(farm_IDs)) {
         write_parquet(fname)
     }
   }
-  print(paste("Farm", f, "of", length(farm_IDs), "(", farm_IDs[f], ")", "finished and saved at", Sys.time()))
+  print(paste("Farm", f, "of", length(farm_IDs), "(", farm_IDs[f], ")", "finished at", Sys.time()))
 }
 
 ## Farm growth ----------------------------------------------------------------------------------------------------
-feed_types <- tar_read(feed_types)
-farm_IDs <- tar_read(farm_IDs)
+Sys.setenv(TAR_PROJECT = "project_main")
+tar_make(names = contains(c("example", "ind_")), reporter = "summary", seconds_meta_append = 300)
 
-df <- tar_read(main_farm_growth, branches = 1)
+farm_IDs <- tar_read(farm_IDs)
+feed_types <- tar_read(feed_types)
+
 stats <- c("weight", "biomass", "dw", "SGR", "E_somat", "P_excr", "L_excr", "C_excr", "P_uneat", "L_uneat", "C_uneat", "ing_act", "anab", "catab", "O2", "NH4", "food_prov", "rel_feeding", "T_response", "total_excr_mat", "total_uneat_mat")
 
-overwrite <- F
+overwrite <- T
 
 for (f in 1:length(farm_IDs)) {
   for (i in 1:length(stats)) {
@@ -196,6 +199,8 @@ for (f in 1:length(farm_IDs)) {
 
 ## Plots ----------------------------------------------------------------------------------------------------------
 ### Example individuals -------------------------------------------------------------------------------------------
+tar_make(names = contains("ind_max"), reporter = "summary", seconds_meta_append = 120)
+
 files <- file.path("data_processed", "example_individual", "raw") %>% list.files(full.names = T)
 p0 <- read_parquet(files[1]) %>% 
   ggplot(aes(x = days, y = value, colour = feed)) +
@@ -214,7 +219,8 @@ overwrite <- T
 # rel_feeding
 # E_somat
 
-max <- tar_read(farm_max_weight) %>% unname() %>% max() %>% set_units("g") %>% set_units("kg") %>% drop_units() %>% ceiling()
+max <- tar_read(ind_max_weight) %>% unname() %>% set_units("g") %>% set_units("kg") %>% drop_units() %>% ceiling()
+min <- tar_read(ind_min_dw) %>% unname() %>% set_units("g") %>% set_units("kg") %>% drop_units() %>% floor()
 weight_fnms <- str_subset(files, "weight")
 for (i in 1:length(weight_fnms)){
   fname <- weight_fnms[i] %>% str_replace_all("raw", "plots/weight") %>% str_replace_all(".parquet", ".png")
@@ -223,7 +229,7 @@ for (i in 1:length(weight_fnms)){
     df <- read_parquet(weight_fnms[i])
     df$value <- set_units(df$value, "g") %>% set_units("kg") %>% drop_units()
     p <- p0 %+% df + 
-      scale_y_continuous(breaks = seq(0, 8, 1), limits = c(0, max)) +
+      scale_y_continuous(breaks = seq(0, 8, 2), limits = c(min, max)) +
       labs(x = "Day of production", y = "Individual weight (kg)")
     ggsave(plot = p, filename = fname, height = 4.5, width = 7)
   
@@ -231,14 +237,15 @@ for (i in 1:length(weight_fnms)){
   }
 }
 
-max <- tar_read(farm_max_dw) %>% unname() %>% max() %>% set_units("g") %>% set_units("kg") %>% drop_units() %>% ceiling()
+max <- tar_read(ind_max_dw) %>% unname() %>% ceiling()
+min <- tar_read(ind_min_dw) %>% unname() %>% floor()
 dw_fnms <- str_subset(files, "dw")
 for (i in 1:length(dw_fnms)){
   fname <- dw_fnms[i] %>% str_replace_all("raw", "plots/dw") %>% str_replace_all(".parquet", ".png")
   if (overwrite == T | !file.exists(fname)) {
     df <- read_parquet(dw_fnms[i])
     p <- p0 %+% df + 
-      scale_y_continuous(breaks = seq(-1, 12, 2), limits = c(-1.75,max)) +
+      scale_y_continuous(breaks = seq(-6, 12, 2), limits = c(-6,max)) +
       geom_hline(aes(yintercept = 0), linetype = "dotted") +
       labs(x = "Day of production", y = expression("Weight change (g d"^-1*")"))
     ggsave(plot = p, filename = fname, height = 4.5, width = 7)
