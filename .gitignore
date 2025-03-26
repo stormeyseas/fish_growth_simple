@@ -49,12 +49,9 @@ po/*~
 # RStudio Connect folder
 rsconnect/
 
-
-data/_general_data/species_layers
-
-
 # Atlantic salmon parameters
 data/atlantic_salmon
+data/_general_data/species_layers
 
 # Processed outputs
 data_processed/example_individual
