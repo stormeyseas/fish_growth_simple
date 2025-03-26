@@ -40,6 +40,10 @@ farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area_
   select(-row_num) %>% 
   mutate(farm_id = row_number())
 
+hemi <- cbind(farms$farm_id, sf::st_coordinates(farms$geometry)) %>% 
+  as.data.frame() %>% rename(farm_ID = V1, lon = X, lat = Y) %>% 
+  write_parquet("data/_general_data/farm_locations/farm_coords.parquet")
+
 day_number <- seq(1:production_cycle)
 
 temp_data <- purrr::map_dfc(.x = day_number, .f = function(day_number){
@@ -117,6 +121,9 @@ mean_farm_temp <- farm_list %>%
 farms_to_omit <- mean_farm_temp %>% 
   filter(mean_temp < 8.5) %>% 
   pull(farm_id)
+
+qsave(x = farms_to_omit, 
+      file = sprintf("data/_general_data/farm_locations/%s_farms_to_omit.qs", this_species))
 
 
 # STEP 2 - Run model ----------------------------------------------------------------------------------------------
