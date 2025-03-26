@@ -30,10 +30,11 @@ this_path <- sprintf("data/%s", this_species)
 # STEP 1: Temperature forcings ------------------------------------------------------------------------------------
 # You don't need to do this again unless you make changes - all the important stuff is saved
 # Prep temperature forcings for each farm site
-production_cycle <- read.csv("data/_general_data/production_cycles/production_cycle.csv") %>% 
-  filter(species == this_species) %>% 
-  rename(production_cycle_length = days) %>% 
-  pull(production_cycle_length)
+# production_cycle <- read.csv("data/_general_data/production_cycles/production_cycle.csv") %>% 
+#   filter(species == this_species) %>% 
+#   rename(production_cycle_length = days) %>% 
+#   pull(production_cycle_length)
+production_cycle <- 830
 
 farms <-  qread("data/_general_data/farm_locations/locations_w_species_fao_area_stocking.qs") %>% 
   filter(model_name == this_species) %>% 
@@ -48,6 +49,7 @@ day_number <- seq(1:production_cycle)
 
 temp_data <- purrr::map_dfc(.x = day_number, .f = function(day_number){
   rast_day_number <- if_else(day_number <= 365, true = day_number, false = day_number-365)
+  rast_day_number <- if_else(rast_day_number <= 365, true = rast_day_number, false = rast_day_number-365)
   message("Getting temperature data for all sites for ", this_species,  " - day ", day_number)
   
   sst_test <- terra::rast(sprintf("data/_general_data/SST/SST_gf_rasters/sst_nasa_mur_L4_0.25_mean2010-2019_day_%s.tif", rast_day_number))
