@@ -1,3 +1,4 @@
+# Setup -----------------------------------------------------------------------------------------------------------
 # library(tidyverse)
 library(magrittr)
 library(dplyr)
@@ -119,9 +120,14 @@ farms_to_omit <- mean_farm_temp %>%
 
 
 # STEP 2 - Run model ----------------------------------------------------------------------------------------------
+Sys.setenv(TAR_PROJECT = "project_individual")
+tar_make(reporter = "summary", seconds_meta_append = 300)
+tar_prune()
+
+Sys.setenv(TAR_PROJECT = "project_farm")
+tar_make(reporter = "summary", seconds_meta_append = 300)
+
 ## Example individuals --------------------------------------------------------------------------------------------
-Sys.setenv(TAR_PROJECT = "project_main")
-tar_make(names = contains(c("exind")), reporter = "summary", seconds_meta_append = 300)
 
 farm_IDs <- tar_read(farm_IDs)
 nms <- c("weight", "dw", "water_temp", "T_response", "P_excr", "L_excr", "C_excr", "P_uneat", "L_uneat", "C_uneat", "food_prov", "food_enc", "rel_feeding", "ing_pot", "ing_act", "E_assim", "E_somat", "anab", "catab", "O2", "NH4", "SGR")
@@ -155,10 +161,10 @@ for (f in 1:length(farm_IDs)) {
   print(paste("Farm", f, "of", length(farm_IDs), "(", farm_IDs[f], ")", "finished at", Sys.time()))
 }
 
-## Farm growth ----------------------------------------------------------------------------------------------------
-Sys.setenv(TAR_PROJECT = "project_main")
-tar_make(names = contains(c("example", "ind_")), reporter = "summary", seconds_meta_append = 300)
 
+exind_weight <- tar_read(exind_weight)
+
+## Farm growth ----------------------------------------------------------------------------------------------------
 farm_IDs <- tar_read(farm_IDs)
 feed_types <- tar_read(feed_types)
 
