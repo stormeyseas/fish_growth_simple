@@ -36,7 +36,7 @@ list(
       read_parquet() %>% 
       filter(!farm_id %in% farms_to_omit) %>% 
       distinct(farm_id) %>% 
-      slice_sample(n = 750) %>%
+      slice_sample(n = 1250) %>%
       as.vector() %>% unlist() %>% unname()
   ),
   tar_target(
