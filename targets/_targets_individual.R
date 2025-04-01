@@ -13,7 +13,7 @@ conflicts_prefer(dplyr::filter(), dplyr::select(), .quiet = T)
 tar_option_set(
   packages = c("stringr", "magrittr", "tidyr", "arrow", "dplyr", "future", "furrr", "ggplot2", "matrixStats", "tibble"), 
   format = "qs", 
-  controller = crew_controller_local(workers = 8),
+  controller = crew_controller_local(workers = 12, seconds_idle = 10),
   workspace_on_error = TRUE
 )
 
@@ -36,7 +36,7 @@ list(
       read_parquet() %>% 
       filter(!farm_id %in% farms_to_omit) %>% 
       distinct(farm_id) %>% 
-      # slice_sample(n = 650) %>% # Only doing a subset of the farms because this is the individuals stuff, not necessary to do them all
+      slice_sample(n = 750) %>%
       as.vector() %>% unlist() %>% unname()
   ),
   tar_target(
@@ -57,8 +57,8 @@ list(
   ),
   
   # starts 1 May in northern hemisphere, 1 October in southern hemisphere
-  tar_target(times_N, c("t_start" = 121, "t_end" = 121+547, "dt" = 1)),
-  tar_target(times_S, c("t_start" = 274, "t_end" = 274+547, "dt" = 1)),
+  tar_target(times_N, c("t_start" = 121, "t_end" = 121+730, "dt" = 1)),
+  tar_target(times_S, c("t_start" = 274, "t_end" = 274+730, "dt" = 1)),
   tar_target(
     farm_coords, 
     read_parquet(farm_coord_file) %>% 
@@ -75,7 +75,7 @@ list(
   
   # Population parameters
   # tar_target(pop_params_file, file.path(google_path,"Population parameters.xlsx"), format = "file"),
-  tar_target(pop_params, c('meanW' = 125, 'deltaW' = 10, 'Wlb' = 0.0001, 'meanImax' = 0.035, 'deltaImax' = 0.0035, 'mortmyt' = 0.00041, 'nruns' = 5000)),
+  tar_target(pop_params, c('meanW' = 175, 'deltaW' = 100, 'Wlb' = 0.0001, 'meanImax' = 0.035, 'deltaImax' = 0.0035, 'mortmyt' = 0.00041, 'nruns' = 5000)),
 
   # Feed parameters
   tar_target(feed_types, c("reference", "past", "future")),
@@ -108,171 +108,95 @@ list(
     iteration = "list"
   ),
   
+## Example individuals --------------------------------------------------------------------------------------------
   tar_target(
     example_individual,
-    fish_growth(
-      pop_params = pop_params,
-      species_params = species_params,
-      water_temp = farm_temp,
-      feed_params = list(
-        Proteins = feed_params_protein,
-        Carbohydrates = feed_params_carbs,
-        Lipids = feed_params_lipids
-      ),
-      times = farm_times,
-      init_weight = pop_params["meanW"],
-      ingmax = pop_params["meanImax"]
-    ),
-    pattern = cross(map(feed_params_protein, feed_params_carbs, feed_params_lipids), map(farm_IDs, farm_temp, farm_times)),
+    command = {
+      df <- fish_growth(
+        pop_params = pop_params,
+        species_params = species_params,
+        water_temp = farm_temp,
+        feed_params = list(
+          Proteins = feed_params_protein[[1]],
+          Carbohydrates = feed_params_carbs[[1]],
+          Lipids = feed_params_lipids[[1]]
+        ),
+        times = farm_times,
+        init_weight = pop_params["meanW"],
+        ingmax = pop_params["meanImax"]
+      )
+      df %>% 
+        as.data.frame() %>% remove_rownames() %>% 
+        mutate(SGR = 100 * (exp((log(weight)-log(weight[1]))/(days-days[1])) - 1),
+               FCR = food_prov/dw) %>% 
+        mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types[1])) %>% 
+        group_by(farm_ID, feed) %>% 
+        mutate(prod_days = days - min(days)+1) %>% 
+        ungroup()
+    },
+    pattern = map(farm_IDs, farm_temp, farm_times)
   ),
-  
-  tar_target(exind_weight, cbind(example_individual[, 1], example_individual[, 2]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, weight = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_SGR, 
-             exind_weight %>% 
-               mutate(SGR = 100 * (exp((log(weight)-log(exind_weight$weight[1]))/(days-exind_weight$days[1])) - 1)) %>% 
-               relocate(SGR, .after = days) %>% select(-weight) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = exind_weight),
-  
-  tar_target(exind_dw, cbind(example_individual[, 1], example_individual[, 3]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, dw = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
 
-  tar_target(exind_TGC, 
-             1000*((exind_weight$weight[nrow(exind_weight)])^(1/3) - (exind_weight$weight[1])^(1/3))/sum(farm_ts_data$temp_c[farm_times['t_start']:farm_times['t_end']]), 
-             pattern = map(exind_weight, map(example_individual, cross(feed_types, map(farm_IDs, farm_times))))
-             ),
-  
-  tar_target(exind_water_temp, cbind(example_individual[, 1], example_individual[, 4]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, water_temp = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_T_response, cbind(example_individual[, 1], example_individual[, 5]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, T_response = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_P_excr, cbind(example_individual[, 1], example_individual[, 6]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, P_excr = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_L_excr, cbind(example_individual[, 1], example_individual[, 7]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, L_excr = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_C_excr, cbind(example_individual[, 1], example_individual[, 8]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, C_excr = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_P_uneat, cbind(example_individual[, 1], example_individual[, 9]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, P_uneat = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_L_uneat, cbind(example_individual[, 1], example_individual[, 10]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, L_uneat = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_C_uneat, cbind(example_individual[, 1], example_individual[, 11]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, C_uneat = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_food_prov, cbind(example_individual[, 1], example_individual[, 12]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, food_prov = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_FCR, 
-             cbind(example_individual[, 1], example_individual[, 12], example_individual[, 3]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types), FCR = V2/V3) %>% 
-               relocate(FCR, .after = days) %>% select(-c(V2, V3)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(),
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_food_enc, cbind(example_individual[, 1], example_individual[, 13]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, food_enc = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_rel_feeding, cbind(example_individual[, 1], example_individual[, 14]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, rel_feeding = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_ing_pot, cbind(example_individual[, 1], example_individual[, 15]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, ing_pot = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_ing_act, cbind(example_individual[, 1], example_individual[, 16]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, ing_act = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_E_assim, cbind(example_individual[, 1], example_individual[, 17]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, E_assim = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_E_somat, cbind(example_individual[, 1], example_individual[, 18]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, E_somat = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_anab, cbind(example_individual[, 1], example_individual[, 19]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, anab = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_catab, cbind(example_individual[, 1], example_individual[, 20]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, catab = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_O2, cbind(example_individual[, 1], example_individual[, 21]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, O2 = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs))),
-  
-  tar_target(exind_NH4, cbind(example_individual[, 1], example_individual[, 22]) %>% 
-               as.data.frame() %>% remove_rownames() %>% rename(days = V1, NH4 = V2) %>% 
-               mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
-               group_by(farm_ID, feed) %>% mutate(prod_days = days - min(days)+1) %>% ungroup(), 
-             pattern = map(example_individual, cross(feed_types, farm_IDs)))
-  
-  ## Senstivities -------------------------------------------------------------------------------------------------
+## Senstivities ---------------------------------------------------------------------------------------------------
+  tar_target(sens_all_params, 
+             command = {
+               vc <- c(species_params, pop_params)
+               nms <- names(vc)[!names(vc) %in% c('betaprot', 'betalip', 'betacarb', 'fcr', 'CS', 'nruns', 'deltaW', 'deltaImax', 'mortmyt', 'Wlb')]
+               vc <- vc[!names(vc) %in% c('betaprot', 'betalip', 'betacarb', 'fcr', 'CS', 'nruns', 'deltaW', 'deltaImax', 'mortmyt', 'Wlb')]
+               names(vc) <- nms
+               vc
+             }),
+  tar_target(sens_params_names, names(sens_all_params)),
+  tar_target(factors, c(0.9, 1, 1.1)),
+
+  tar_target(
+    name = sens_adjusted_params,
+    command = adj_params(sens_all_params, sens_params_names, factors),
+    pattern = cross(sens_params_names, factors),
+    iteration = "list"
+  ),
+  tar_target(
+    sens_individual,
+    command = {
+      sens <- fish_growth(
+        pop_params = sens_adjusted_params,
+        species_params = sens_adjusted_params,
+        water_temp = farm_temp,
+        feed_params = list(
+          Proteins = feed_params_protein[[1]],
+          Carbohydrates = feed_params_carbs[[1]],
+          Lipids = feed_params_lipids[[1]]
+        ),
+        times = farm_times,
+        init_weight = pop_params["meanW"],
+        ingmax = pop_params["meanImax"]
+      ) %>% as.data.frame() %>% remove_rownames() %>% 
+        mutate(adj_param = sens_params_names,
+               factor = factors)
+      
+      data.frame(
+        weight = last(sens$weight[!is.na(sens$weight)]),
+        dw = mean(sens$dw, na.rm = T),
+        P_excr = sum(sens$P_excr, na.rm = T),
+        L_excr = sum(sens$L_excr, na.rm = T),
+        C_excr = sum(sens$C_excr, na.rm = T),
+        P_uneat = sum(sens$P_uneat, na.rm = T),
+        L_uneat = sum(sens$L_uneat, na.rm = T),
+        C_uneat = sum(sens$C_uneat, na.rm = T),
+        food_prov = sum(sens$food_prov, na.rm = T),
+        rel_feeding = mean(sens$rel_feeding, na.rm = T),
+        ing_act = sum(sens$ing_act, na.rm = T),
+        anab = sum(sens$anab, na.rm = T),
+        catab = sum(sens$catab, na.rm = T),
+        O2 = sum(sens$O2, na.rm = T),
+        NH4 = sum(sens$NH4, na.rm = T),
+        adj_param = unique(sens$adj_param),
+        factor = unique(sens$factor)
+      )
+    },
+    pattern = cross(map(farm_IDs, farm_temp, farm_times), map(sens_adjusted_params, cross(sens_params_names, factors))),
+    memory = "persistent"
+  )
 )
 
 

@@ -121,7 +121,7 @@ mean_farm_temp <- farm_list %>%
   })
 
 farms_to_omit <- mean_farm_temp %>% 
-  filter(mean_temp < 8.5) %>% 
+  filter(mean_temp < 4) %>% 
   pull(farm_id)
 
 qsave(x = farms_to_omit, 
@@ -129,51 +129,69 @@ qsave(x = farms_to_omit,
 
 
 # STEP 2 - Run model ----------------------------------------------------------------------------------------------
+## Example individuals --------------------------------------------------------------------------------------------
 Sys.setenv(TAR_PROJECT = "project_individual")
-tar_make(reporter = "summary", seconds_meta_append = 300)
+tar_make(names = sens_individual, reporter = "summary", seconds_meta_append = 300)
 tar_prune()
 
+farm_IDs <- tar_read(farm_IDs)
+sens_all_params <- tar_read(sens_all_params)
+# sens <- tar_read(sens_individual, branches = 1)
+patt <- data.frame(
+  param = rep(rep(1:length(sens_all_params), each = 3), times = length(farm_IDs)),
+  factor = rep(c(0.9,1,1.1), times = length(sens_all_params)*length(farm_IDs))
+  )
+patt$br <- 1:nrow(patt)
+
+wt_ls <- dw_ls <- excr_ls <- uneat_ls <- list()
+for (p in 1:length(sens_all_params)) {
+  br <- patt$br[patt$param == p]
+  sens <- tar_read(sens_individual, branches = br)
+  sens$farm_ID <- rep(farm_IDs, times = 3)
+  
+  wt_ls[[p]] <- sens %>% 
+    select(weight, farm_ID, adj_param, factor) %>% 
+    pivot_wider(names_from = factor, names_prefix = "p", values_from = weight) %>% 
+    mutate(sens = (p1.1 - p0.9)/(0.2*p1)) %>% 
+    group_by(adj_param) %>% 
+    reframe(sd = sd(sens),
+            sens = mean(sens))
+
+  dw_ls[[p]] <- sens %>% 
+    select(dw, farm_ID, adj_param, factor) %>% 
+    pivot_wider(names_from = factor, names_prefix = "p", values_from = dw) %>% 
+    mutate(sens = (p1.1 - p0.9)/(0.2*p1)) %>% 
+    group_by(adj_param) %>% 
+    reframe(sd = sd(sens),
+            sens = mean(sens))
+  
+  excr_ls[[p]] <- sens %>% 
+    mutate(excr = P_excr + L_excr + C_excr) %>% 
+    select(excr, farm_ID, adj_param, factor) %>% 
+    pivot_wider(names_from = factor, names_prefix = "p", values_from = excr) %>% 
+    mutate(sens = (p1.1 - p0.9)/(0.2*p1)) %>% 
+    group_by(adj_param) %>% 
+    reframe(sd = sd(sens),
+            sens = mean(sens))
+
+  uneat_ls[[p]] <- sens %>% 
+    mutate(uneat = P_uneat + L_uneat + C_uneat) %>% 
+    select(uneat, farm_ID, adj_param, factor) %>% 
+    pivot_wider(names_from = factor, names_prefix = "p", values_from = uneat) %>% 
+    mutate(sens = (p1.1 - p0.9)/(0.2*p1)) %>% 
+    group_by(adj_param) %>% 
+    reframe(sd = sd(sens),
+            sens = mean(sens))
+}
+wt_ls %>% bind_rows() %>% write_parquet(file.path("data", "atlantic_salmon", "data_products", "weight_parameter_sensitivity.parquet"))
+dw_ls %>% bind_rows() %>% write_parquet(file.path("data", "atlantic_salmon", "data_products", "dw_parameter_sensitivity.parquet"))
+excr_ls %>% bind_rows() %>% write_parquet(file.path("data", "atlantic_salmon", "data_products", "excreted_parameter_sensitivity.parquet"))
+uneat_ls %>% bind_rows() %>% write_parquet(file.path("data", "atlantic_salmon", "data_products", "uneaten_parameter_sensitivity.parquet"))
+
+## Farm growth ----------------------------------------------------------------------------------------------------
 Sys.setenv(TAR_PROJECT = "project_farm")
 tar_make(reporter = "summary", seconds_meta_append = 300)
 
-## Example individuals --------------------------------------------------------------------------------------------
-
-farm_IDs <- tar_read(farm_IDs)
-nms <- c("weight", "dw", "water_temp", "T_response", "P_excr", "L_excr", "C_excr", "P_uneat", "L_uneat", "C_uneat", "food_prov", "food_enc", "rel_feeding", "ing_pot", "ing_act", "E_assim", "E_somat", "anab", "catab", "O2", "NH4", "SGR")
-
-overwrite <- F
-
-for (f in 1:length(farm_IDs)) {
-  df_1 <- tar_read(example_individual, branches = f) %>% as.data.frame()
-  df_2 <- tar_read(example_individual, branches = length(farm_IDs) + f) %>% as.data.frame()
-  df_3 <- tar_read(example_individual, branches = 2*length(farm_IDs) + f) %>% as.data.frame()
-  df_1$SGR <- 100 * (exp((log(df_1$weight)-log(df_1$weight[1]))/(df_1$days-df_1$days[1])) - 1)
-  df_2$SGR <- 100 * (exp((log(df_2$weight)-log(df_2$weight[1]))/(df_2$days-df_2$days[1])) - 1)
-  df_3$SGR <- 100 * (exp((log(df_3$weight)-log(df_3$weight[1]))/(df_3$days-df_3$days[1])) - 1)
-  feed_types <- tar_read(feed_types)
-  
-  for (i in 1:length(nms)) {
-    fname <- file.path("data_processed", "example_individual", "raw", str_c("farmID_", fixnum(farm_IDs[f]), "_", nms[i], ".parquet"))
-    if (overwrite == T | !file.exists(fname)) {
-      data.frame(
-        days = df_1[ ,1],
-        reference = df_1[ ,nms[i]],
-        past = df_2[ ,nms[i]],
-        future = df_3[ ,nms[i]]
-      ) %>% 
-        mutate(output = nms[i]) %>% 
-        pivot_longer(names_to = "feed", values_to = "value", cols = c(reference, past, future)) %>% 
-        mutate(farm_ID = farm_IDs[f], feed = factor(feed, levels = feed_types)) %>% 
-        write_parquet(fname)
-    }
-  }
-  print(paste("Farm", f, "of", length(farm_IDs), "(", farm_IDs[f], ")", "finished at", Sys.time()))
-}
-
-
-exind_weight <- tar_read(exind_weight)
-
-## Farm growth ----------------------------------------------------------------------------------------------------
 farm_IDs <- tar_read(farm_IDs)
 feed_types <- tar_read(feed_types)
 

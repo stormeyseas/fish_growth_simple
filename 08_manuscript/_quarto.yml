@@ -17,6 +17,5 @@ acronyms:
       
 execute: 
   cache: true
-  freeze: true
   
 notebook-links: false

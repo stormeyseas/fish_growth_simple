@@ -202,11 +202,12 @@ feeding_rate <- function(water_temp, species_params){
     ((species_params['Tma']-water_temp)/(species_params['Tma']-species_params['Toa']))^(species_params['betac']*(species_params['Tma']-species_params['Toa']))
 }
 
-food_prov_rate <- function(rel_feeding, ing_pot, weight){
+food_prov_rate <- function(rel_feeding, ing_pot, ing_pot_10){
   ifelse(
     rel_feeding > 0.1, 
-    yes = ing_pot + rnorm(1, 0.025, 0.009)*ing_pot, 
-    no = 0.25 * 0.066 * weight^0.75
+    yes = ing_pot + rnorm(1, 0.035, 0.0075)*ing_pot, 
+    no = ing_pot_10
+    # no = 0.25 * 0.066 * weight^0.75
   )
 }
 
@@ -268,7 +269,7 @@ fish_growth <- function(pop_params, species_params, water_temp, feed_params, tim
   days <- (times['t_start']:times['t_end'])*times['dt']
   
   # vectors of the other important growth metrics: intake, functional response, assimilated energy and growth increment
-  rel_feeding <- T_response <- ing_pot <- food_prov <- food_enc <- ing_act <- E_somat <- E_assim <- P_excr <- L_excr <- C_excr <- P_uneat <- L_uneat <- C_uneat <- anab <- catab <- O2 <- NH4 <- dw <- weight <- rep(0, times['t_end'])
+  rel_feeding <- T_response <- ing_pot <- food_prov <- food_enc <- ing_act <- E_somat <- E_assim <- P_excr <- L_excr <- C_excr <- P_uneat <- L_uneat <- C_uneat <- anab <- catab <- O2 <- NH4 <- dw <- weight <- rep(0, length(days))
 
   # start size in grams
   weight[1] <- init_weight
@@ -280,7 +281,7 @@ fish_growth <- function(pop_params, species_params, water_temp, feed_params, tim
     
     # Ingested mass [g/d]
     ing_pot[i] <- ingmax * (weight[i]^species_params['m']) * rel_feeding[i]
-    food_prov[i] <- food_prov_rate(rel_feeding[i], ing_pot[i], weight[i])
+    food_prov[i] <- food_prov_rate(rel_feeding[i], ing_pot[i], ing_pot_10 = ingmax * (weight[i]^species_params['m']) * 0.1)
     food_enc[i] <- species_params['eff'] * food_prov[i] # encounter rate
     ing_act[i] <- min(food_enc[i], ing_pot[i]) # [g/d] Actual ingestion rate cannot be more than encountered food
     
@@ -317,23 +318,23 @@ fish_growth <- function(pop_params, species_params, water_temp, feed_params, tim
     NH4[i] <- O2[i]*0.06                              # NH4 produced [gN/d]
     
     # Mass balance
-    dw[i]  <- (anab[i] - catab[i]) / E_somat[i] # weight increment [g/d]
+    dw[i]  <- (anab[i] - catab[i]) / E_somat[i]       # weight increment [g/d]
     
     weight[i+1] <- weight[i] + dw[i]*times['dt']
   }
   
-  dl <- length(days)
-  
   # Function outputs
-  output <- cbind(days, weight = weight[1:dl], dw, water_temp = water_temp[1:dl], T_response, P_excr, L_excr, C_excr, P_uneat, L_uneat, C_uneat, food_prov, food_enc, rel_feeding, ing_pot, ing_act, E_assim, E_somat, anab, catab, O2, NH4)
+  output <- cbind(days, weight = weight[1:length(days)], dw, water_temp = water_temp[1:length(days)], T_response, P_excr, L_excr, C_excr, P_uneat, L_uneat, C_uneat, food_prov, food_enc, rel_feeding, ing_pot, ing_act, E_assim, E_somat, anab, catab, O2, NH4)
   
   return(output)
 }
 
 farm_growth <- function(pop_params, species_params, feed_params, water_temp, times, N_pop, nruns){
 
+  days <- (times['t_start']:times['t_end'])*times['dt']
+  
   # Initiate matrices to fill for each population iteration
-  weight_mat <- biomass_mat <- dw_mat <- SGR_mat <- E_somat_mat <- P_excr_mat <-  L_excr_mat <- C_excr_mat <- P_uneat_mat <- L_uneat_mat <- C_uneat_mat <- ing_act_mat <- anab_mat <- catab_mat <- O2_mat <- NH4_mat <- food_prov_mat <- rel_feeding_mat <- T_response_mat <- total_excr_mat <- total_uneat_mat <- matrix(data = 0, nrow = nruns, ncol = times['t_end']) 
+  weight_mat <- biomass_mat <- dw_mat <- SGR_mat <- E_somat_mat <- P_excr_mat <-  L_excr_mat <- C_excr_mat <- P_uneat_mat <- L_uneat_mat <- C_uneat_mat <- ing_act_mat <- anab_mat <- catab_mat <- O2_mat <- NH4_mat <- food_prov_mat <- rel_feeding_mat <- T_response_mat <- total_excr_mat <- total_uneat_mat <- matrix(data = 0, nrow = nruns, ncol = length(days)) 
   
   init_weight <- rnorm(nruns, mean = pop_params['meanW'], sd = pop_params['deltaW'])
   ingmax <- rnorm(nruns, mean = pop_params['meanImax'], sd = pop_params['deltaImax'])
@@ -352,26 +353,26 @@ farm_growth <- function(pop_params, species_params, feed_params, water_temp, tim
     
     # Append to matrix
     weight_mat[n,]      <- ind_output[,'weight']
-    biomass_mat[n,]     <- ind_output[,'weight']*N_pop[1:times['t_end']]
+    biomass_mat[n,]     <- ind_output[,'weight']*N_pop[1:length(days)]
     dw_mat[n,]          <- ind_output[,'dw']
     SGR_mat[n,]         <- 100 * (exp((log(weight_mat[n,])-log(weight_mat[n,1]))/(ind_output[,'days'])) - 1)
     E_somat_mat[n,]     <- ind_output[,'E_somat']
-    P_excr_mat[n,]      <- ind_output[,'P_excr']*N_pop[1:times['t_end']]
-    L_excr_mat[n,]      <- ind_output[,'L_excr']*N_pop[1:times['t_end']]
-    C_excr_mat[n,]      <- ind_output[,'C_excr']*N_pop[1:times['t_end']]
-    P_uneat_mat[n,]     <- ind_output[,'P_uneat']*N_pop[1:times['t_end']]
-    L_uneat_mat[n,]     <- ind_output[,'L_uneat']*N_pop[1:times['t_end']]
-    C_uneat_mat[n,]     <- ind_output[,'C_uneat']*N_pop[1:times['t_end']]
-    ing_act_mat[n,]     <- ind_output[,'ing_act']*N_pop[1:times['t_end']]
+    P_excr_mat[n,]      <- ind_output[,'P_excr']*N_pop[1:length(days)]
+    L_excr_mat[n,]      <- ind_output[,'L_excr']*N_pop[1:length(days)]
+    C_excr_mat[n,]      <- ind_output[,'C_excr']*N_pop[1:length(days)]
+    P_uneat_mat[n,]     <- ind_output[,'P_uneat']*N_pop[1:length(days)]
+    L_uneat_mat[n,]     <- ind_output[,'L_uneat']*N_pop[1:length(days)]
+    C_uneat_mat[n,]     <- ind_output[,'C_uneat']*N_pop[1:length(days)]
+    ing_act_mat[n,]     <- ind_output[,'ing_act']*N_pop[1:length(days)]
     anab_mat[n,]        <- ind_output[,'anab']
     catab_mat[n,]       <- ind_output[,'catab']
     O2_mat[n,]          <- ind_output[,'O2']
-    NH4_mat[n,]         <- ind_output[,'NH4']*N_pop[1:times['t_end']]
-    food_prov_mat[n,]   <- ind_output[,'food_prov']*N_pop[1:times['t_end']]
+    NH4_mat[n,]         <- ind_output[,'NH4']*N_pop[1:length(days)]
+    food_prov_mat[n,]   <- ind_output[,'food_prov']*N_pop[1:length(days)]
     rel_feeding_mat[n,] <- ind_output[,'rel_feeding']
     T_response_mat[n,]  <- ind_output[,'T_response']
-    total_excr_mat[n,]  <- (ind_output[,'P_excr'] + ind_output[,'L_excr'] + ind_output[,'C_excr']) * N_pop[1:times['t_end']]
-    total_uneat_mat[n,] <- (ind_output[,'P_uneat'] + ind_output[,'L_uneat'] + ind_output[,'C_uneat']) * N_pop[1:times['t_end']]
+    total_excr_mat[n,]  <- (ind_output[,'P_excr'] + ind_output[,'L_excr'] + ind_output[,'C_excr']) * N_pop[1:length(days)]
+    total_uneat_mat[n,] <- (ind_output[,'P_uneat'] + ind_output[,'L_uneat'] + ind_output[,'C_uneat']) * N_pop[1:length(days)]
   }
 
   out_list <- list(
@@ -857,13 +858,13 @@ generate_pop <- function(N_seed, mort, times) {
   
   # Initial condition and vectors initialization
   N_pop <- rep(0, length(ts))                              # Initialize vector N_pop
-  N_pop[1] <- mean(N_seed)                                 # Impose initial condition
+  N_pop[1] <- round(N_seed)                                # Impose initial condition
   dN <- rep(0, length(ts))                                 # Initialize vector dN
-  
+
   # for cycle that solves population ODE with Euler method
-  for (t in 1:length(ts)){ 
-    dN[t] =- mort*N_pop[t]                                 # Individuals increment
-    N_pop[t+1] = N_pop[t]+dN[t]*times['dt']                # Individuals at time t+1
+  for (t in 2:length(ts)){
+    dN =- round(mort*N_pop[t-1])                           # Individuals increment
+    N_pop[t] = N_pop[t-1]+dN*times['dt']                   # Individuals at time t+1
     
     # # Taking out the management alterations for now
     # for (i in 1:length(manag[,1])) {  # For cycle that adjusts N_pop according with management strategies
@@ -879,4 +880,7 @@ fixnum <- function(n, digits = 4) {
   str_flatten(c(rep("0", digits-nchar(as.character(n))), as.character(n)))
 }
 
-
+adj_params <- function(params, name, fact){
+  params[name] <- params[name] * fact
+  return(params)
+}

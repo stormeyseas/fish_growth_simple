@@ -34,7 +34,7 @@ filters:
   - acronyms
   
 execute:
-  eval: true
+  eval: false
   echo: false
   warning: false
   message: false
@@ -97,20 +97,18 @@ Individual models were then upscaled using monte-carlo simulations to simulate s
 # Water temp
 
 ```{r water-temp-data}
-#| eval: true
 #| code-summary: Load and cache data to avoid spending a long time on it every render.
 
 # This is the full idealised year (2 years?) of temperature data
 sst <- file.path(base_path, "data", "_general_data", "SST", "farm_SST_extracted.parquet") %>% read_parquet()
 
 # This is the actual temperature curve for the farming period
-farm_temp <- tar_read(exind_water_temp, store = targets_store, branches = b1)
+farm_temp <- tar_read(example_individual, store = targets_store, branches = b1)
 ```
 
 Originally, all salmon were transferred to grow-out cages (model began) on January 1st. This isn't particularly realistic. Now, all farms begin the modelling period in spring (1st of May in the northern hemisphere, 1st of October in the southern hemisphere).
 
 ```{r fig-water-temp}
-#| eval: true
 #| fig-cap: Water temperature for the production period, starting at either DOY 121 (1st May, northern hemisphere) or DOY 274 (1st October, southern hemisphere).
 
 farm_temp %>% 
@@ -125,7 +123,6 @@ farm_temp %>%
 # Weight
 
 ```{r weight-related-data}
-#| eval: true
 #| code-summary: Load and cache data to avoid spending a long time on it every render.
 
 species_params <- tar_read(species_params, store = targets_store)
@@ -143,12 +140,13 @@ weight_ocean <- weight %>%
   filter(prod_days == 547) %>% 
   group_by(farm_ID, feed) %>% 
   reframe(final_weight = max(weight))
+
+# @fig-ref-weight shows the change in weight for 25 individuals grown at different farms. Within the first 5 months (post-smolt period) the fish grow from 125g to `r round(mean(weight_smolt$final_weight), 1)`g, or approximately `r round(round(mean(weight_smolt$final_weight), 1)/125, 1)`$\times$ their starting weight. This is better than most production cycles. By the end of the production cycle (547 days, 18 months) the fish have grown to a mean of `r round(mean(weight_ocean$final_weight), 1)` g, and a max of `r round(max(weight_ocean$final_weight), 1)` g. This is not quite what's needed - I'm expecting individual weights to at least approximate the mean commercial weight of 5kg.
 ```
 
-@fig-ref-weight shows the change in weight for 25 individuals grown at different farms. Within the first 5 months (post-smolt period) the fish grow from 125g to `r round(mean(weight_smolt$final_weight), 1)`g, or approximately `r round(round(mean(weight_smolt$final_weight), 1)/125, 1)`$\times$ their starting weight. This is better than most production cycles. By the end of the production cycle (547 days, 18 months) the fish have grown to a mean of `r round(mean(weight_ocean$final_weight), 1)` g, and a max of `r round(max(weight_ocean$final_weight), 1)` g. This is not quite what's needed - I'm expecting individual weights to at least approximate the mean commercial weight of 5kg.
+
 
 ```{r fig-ref-weight}
-#| eval: true
 #| fig-cap: Weight of single individuals grown at 25 random farms across the production period, starting at either DOY 121 (1st May, northern hemisphere) or DOY 274 (1st October, southern hemisphere).
 
 weight %>% 
@@ -162,7 +160,6 @@ weight %>%
 ```
 
 ```{r fig-ref-TGC}
-#| eval: true
 #| fig-cap: Thermal-unit Growth Coefficient (TGC) of all 2721 farms across the production period, starting at either DOY 121 (1st May, northern hemisphere) or DOY 274 (1st October, southern hemisphere).
 
 data.frame(TGC = TGC) %>% 
@@ -173,7 +170,6 @@ data.frame(TGC = TGC) %>%
 ```
 
 ```{r fig-ref-SGR}
-#| eval: true
 #| fig-cap: Specific growth rate of single individuals grown at 25 random farms across the production period, starting at either DOY 121 (1st May, northern hemisphere) or DOY 274 (1st October, southern hemisphere).
 
 SGR %>% 
@@ -187,7 +183,6 @@ SGR %>%
 ```
 
 ```{r fig-ref-FCR}
-#| eval: false
 #| fig-cap: FCR of 25 random farms across the production period, starting at either DOY 121 (1st May) or DOY 274 (1st October).
 
 FCR %>% 
@@ -200,7 +195,6 @@ FCR %>%
 ```
 
 ```{r fig-water-temperature}
-#| eval: false
 
 sst_means <- sst %>% 
   group_by(farm_id) %>% 
@@ -260,8 +254,6 @@ df %>%
 # Feed data
 
 ```{r feed-raw-data}
-#| cache: false
-#| eval: true
 #| code-summary: Load and cache data to avoid spending a long time on it every render.
 
 feed_params_protein <- tar_read(feed_params_protein, store = targets_store)
@@ -272,7 +264,6 @@ feed_params_lipids <- tar_read(feed_params_lipids, store = targets_store)
 Incorporated the individual digestibility of each ingredient and switched to tracking ingredients separately instead of feed – this unfortunately makes the model run slower but I think it will be worth it once the digestibility coefficients from the experiments are incorporated.
 
 ```{r feed-data}
-#| eval: true
 
 ref_feed <- list(
     feed_params_protein[[1]] %>% 
@@ -347,8 +338,6 @@ I set up some “example fish” to speed up future model adjustments – basica
 ## Food provided vs food eaten
 
 ```{r food-raw-data}
-#| cache: false
-#| eval: true
 #| code-summary: Load and cache data to avoid spending a long time on it every render.
 
 ing_pot <- tar_read(exind_ing_pot, store = targets_store, branches = c(b1, b2, b3))
@@ -359,7 +348,6 @@ food_prov <- tar_read(exind_food_prov, store = targets_store, branches = c(b1, b
 Within the model, salmon have a maximum ingestion potential (based on their weight and individualised feeding rate). The actual food ingested is 97% of their ingestion potential (food encounter efficiency) or the total food provided, whichever is less. @fig-food-prov-theoretical shows an example of how food provided scales with potential individual ingestion.
 
 ```{r fig-food-prov-theoretical}
-#| eval: true
 #| fig-cap: Example of food provided based on potential ingestion (where feeding rate ranges from 0 to 1). This curve is constructed with a single fish of mean starting weight (125 g) and average maximum ingestion rate (0.035). The dashed line shows food provision == potential ingestion.
 
 df <- data.frame(rel_feeding = seq(0,1,0.01)) %>% 
@@ -382,21 +370,18 @@ df %>%
 ```
 
 ```{r feed-nums}
-#| eval: true
-#| cache: false
 
 prov <- merge(ing_pot, ing_act, by = c("farm_ID", "feed", "days", "prod_days")) %>% 
   merge(food_prov, by = c("farm_ID", "feed", "days", "prod_days")) %>% 
   mutate(uneaten = food_prov - ing_act,
          uneaten_perc = uneaten/food_prov) %>% 
   select(-c(food_prov, ing_act))
+
+# Therefore, uneaten feed can be quite high (up to \~30%) when relative feeding is $\leq$10%. But generally, the median amount of uneaten food is `r round(100*median(prov$uneaten_perc), 1)`% (@fig-uneaten-feed).
 ```
 
-Therefore, uneaten feed can be quite high (up to \~30%) when relative feeding is $\leq$10%. But generally, the median amount of uneaten food is `r round(100*median(prov$uneaten_perc), 1)`% (@fig-uneaten-feed).
 
 ```{r fig-uneaten-feed}
-#| eval: true
-#| cache: false
 #| fig-cap: Difference between food provided and actual ingestion (i.e. total food ingestion efficiency) for 25 random farms. 
 
 prov %>% 
@@ -407,5 +392,96 @@ prov %>%
   theme_classic() +
   labs(x = "Potential feed ingestion (g)", y = "Uneaten food (% of provided)")
 ```
+
+# Parameters for Atlantic salmon
+
+```{r salmon params}
+#| code-summary: lsdkjfk
+#| eval: true
+
+params <- tar_read(sens_all_params, store = targets_store)
+pnames <- names(params)
+```
+
+|:-------:|:----:|-------------------|-------------|---------------------------|
+| Parameter | Value | Units | Description | Reference | Comment |
+| $\alpha$             | `r unname(params['alpha'])` | - | Feeding catabolism coefficient | @broekhuizen_modelling_1994 | *Salvelinus alpinus*, *Oncorhynchus mykiss* (temps: 8–13$^{\circ}$C) |
+| $\epsilon_{P}$       | `r unname(params['epsprot'])` | J g protein-1 | Energy content of protein | @baldan_r_2018 |  |
+| $\epsilon_{L}$       | `r unname(params['epslip'])` | J g lipid-1 | Energy content of lipid | @baldan_r_2018 |  |
+| $\epsilon_{C}$       | `r unname(params['epscarb'])` | J g carbohydrate-1 | Energy content of carbohydrate | @baldan_r_2018 |  |
+| $\epsilon_{O_2}$     | `r unname(params['epsO2'])` | J g O2-1 | Energy consumed by the respiration of 1 g of oxygen | @elliott_energy_1975 |  |
+| $pk$                 | `r unname(params['pk'])` | d-1 | Temperature coefficient for the fasting catabolism | @macnaughton_using_2019 |  |
+| $k_0$                | `r unname(params['k0'])` | degree C-1 | Fasting catabolism at 0 Celsius degree | @macnaughton_using_2019 |  |
+| $m$                  | `r unname(params['m'])` | Weight exponent for the anabolism | Description | @broekhuizen_modelling_1994 | *Salvelinus alpinus*, *Oncorhynchus mykiss* (temps: 8–13$^{\circ}$C) |
+| $n$                  | `r unname(params['n'])` | Weight exponent for the catabolism | Description | @baldan_r_2018 |  |
+| $\beta C$            | `r unname(params['betac'])` | - | Shape coefficient for the feeding function | @jonsson_thermal_2001 | Fish size range: 2.25$\pm$0.49 – 11.5$\pm$5.29 g, temperature ranges: 5–24$^{\circ}$C. Coefficent for mean daily energy intake of the moderately fast growing group, 0.4398 (mean fast group), 0.2214 (mean slow group) |
+| $T_{max}$            | `r unname(params['Tma'])` | C | Maximum lethal temperature | @poletto_unusual_2017 | Juvenile Chinook salmon (19.8$\pm$0.02 g, acclimation temp: 15$^{\circ}$C, 19$^{\circ}$C) |
+| $T_{opt}$            | `r unname(params['Toa'])` | C | Optimal temperature | @jonsson_thermal_2001 | Fish size range: 2.25$\pm$0.49 – 11.5$\pm$5.29 g, temperature ranges: 5–24$^{\circ}$C. 
+Alt value: 14°C [@handeland_effect_2008], *Salmo salar* initial size: 77.0$\pm$14.6 g, temps: 6, 10, 14, 18$^{\circ}$C |
+| $T_{min}$            | `r unname(params['Taa'])` | C | Lowest feeding temperature | @vadboncoeur_lowering_2023 |  Fish essentially stop feeding when below 2$^{\circ}$C |
+| $\omega$             | `r unname(params['omega'])` | g O2 / g | Oxygen consumption:weight loss ratio | @baldan_r_2018 | Calibrated value |
+| $a$                  | `r unname(params['a'])` | J g tissue-1 | Energy content of fish tissue | @tien_development_2016 | Alt value: 17.02350 (nls model fitted to female Atlantic salmon data extracted and transformed from @jonsson_energy_2003 |
+| $k$                  | `r unname(params['k'])` | - | Weight exponent for energy content | @tien_development_2016 | Alt value: 1.65175 (nls model fitted to female Atlantic salmon data extracted and transformed from @jonsson_energy_2003 |
+| $eff$                | `r unname(params['eff'])` | - | Food ingestion efficiency | @uglem_does_2020 | Range: 95-97% ingestion efficiency |
+| $\overline{W}$       | `r unname(params['meanW'])` | g | Dry weight mean | @dempsey_estimating_2023 | Range of 100-150 given so used a mean of 125 and sd of 10 which over 1000 draws from a normal distribution delivers a minimum and maximum close to these numbers |
+| $\Delta{W}$          | `r unname(params['deltaW'])` | g | Dry weight standard deviation | @dempsey_estimating_2023 | Range of 100-150 given so used a mean of 125 and sd of 10 which over 1000 draws from a normal distribution delivers a minimum and maximum close to these numbers |
+| $Wlb$                | `r unname(params['Wlb'])` | g | Dry weight lower bound | Reference |  |
+| $\overline{I_{max}}$ | `r unname(params['meanImax'])` | g g-1 fish day-1 | Ingestion rate mean | [FAO](https://www.fao.org/fileadmin/user_upload/affris/docs/tabl10.pdf) |  |
+| $\Delta{I_{max}}$    | `r unname(params['deltaImax'])` | g g-1 fish day-1 | Ingestion rate standard deviation | [FAO](https://www.fao.org/fileadmin/user_upload/affris/docs/tabl10.pdf) |  |
+| $mort$               | `r unname(params['mortmyt'])` | d-1 | Natural mortality rate | @tvete_towards_2023 |  |
+
+## Sensitivity
+
+```{r param sensitivity data}
+sens_wt <- file.path("data", "atlantic_salmon", "data_products", "weight_parameter_sensitivity.parquet") %>% read_parquet()
+sens_dw <- file.path("data", "atlantic_salmon", "data_products", "dw_parameter_sensitivity.parquet") %>% read_parquet()
+sens_excr <- file.path("data", "atlantic_salmon", "data_products", "excreted_parameter_sensitivity.parquet") %>% read_parquet()
+sens_uneat <- file.path("data", "atlantic_salmon", "data_products", "uneaten_parameter_sensitivity.parquet") %>% read_parquet()
+```
+
+```{r fig-param-sens-weight}
+sens_wt %>% 
+  mutate(adj_param = factor(adj_param, levels = rev(adj_param))) %>% 
+  ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
+  geom_col(alpha = 0.35, colour = "black") +
+  geom_errorbar(width = 0.3) +
+  geom_hline(aes(yintercept = 0), linetype = "dashed") +
+  coord_flip() +
+  theme_classic()
+```
+
+```{r fig-param-sens-dw}
+sens_dw %>% 
+  mutate(adj_param = factor(adj_param, levels = rev(adj_param))) %>% 
+  ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
+  geom_col(alpha = 0.35, colour = "black") +
+  geom_errorbar(width = 0.3) +
+  geom_hline(aes(yintercept = 0), linetype = "dashed") +
+  coord_flip() +
+  theme_classic()
+```
+
+```{r fig-param-sens-excr}
+sens_excr %>% 
+  mutate(adj_param = factor(adj_param, levels = rev(adj_param))) %>% 
+  ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
+  geom_col(alpha = 0.35, colour = "black") +
+  geom_errorbar(width = 0.3) +
+  geom_hline(aes(yintercept = 0), linetype = "dashed") +
+  coord_flip() +
+  theme_classic()
+```
+
+```{r fig-param-sens-uneat}
+sens_uneat %>% 
+  mutate(adj_param = factor(adj_param, levels = rev(adj_param))) %>% 
+  ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
+  geom_col(alpha = 0.35, colour = "black") +
+  geom_errorbar(width = 0.3) +
+  geom_hline(aes(yintercept = 0), linetype = "dashed") +
+  coord_flip() +
+  theme_classic()
+```
+
 
 # References

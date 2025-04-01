@@ -74,7 +74,7 @@ list(
     N_population, 
     generate_pop(
       N_seed = unique(farm_static_data$stocking_n), 
-      mort = pop_params['mortmyt'],
+      mort = 0.00041,
       times = farm_times
     ), 
     pattern = map(farm_static_data, farm_times)
@@ -85,7 +85,7 @@ list(
   tar_target(species_params, get_spec_params(species_param_file, "Atlantic salmon")),
   
   # Population parameters
-  tar_target(pop_params, c('meanW' = 125, 'deltaW' = 10, 'Wlb' = 0.0001, 'meanImax' = 0.035, 'deltaImax' = 0.0035, 'mortmyt' = 0.00041, 'nruns' = 5000)),
+  tar_target(pop_params, c('meanW' = 175, 'deltaW' = 100, 'Wlb' = 0.0001, 'meanImax' = 0.035, 'deltaImax' = 0.0035, 'mortmyt' = 0.00041, 'nruns' = 5000)),
   
   # Feed parameters
   tar_target(feed_types, c("reference", "past", "future")),

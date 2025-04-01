@@ -2,7 +2,7 @@ project:
   type: manuscript
 
 manuscript:
-  article: 08_manuscript.qmd
+  article: 05_methods_and_supplementaries.qmd
   # manuscript-url: # The deployed url for this manuscript
 
 acronyms:
@@ -17,6 +17,5 @@ acronyms:
       
 execute: 
   cache: true
-  freeze: true
   
 notebook-links: false
