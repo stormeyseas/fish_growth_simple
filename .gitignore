@@ -57,3 +57,6 @@ data/_general_data/species_layers
 data_processed/example_individual
 data_processed/farm_growth
 
+# Confidential data
+XX_confidential/*
+
