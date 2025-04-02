@@ -160,16 +160,6 @@ weight %>%
   labs(x = "Day of production cycle", y = "Individual weight (g)")
 ```
 
-```{r fig-ref-TGC}
-#| fig-cap: Thermal-unit Growth Coefficient (TGC) of all 2721 farms across the production period, starting at either DOY 121 (1st May, northern hemisphere) or DOY 274 (1st October, southern hemisphere).
-
-data.frame(TGC = TGC) %>% 
-  ggplot(aes(x = TGC)) +
-  geom_histogram(fill = NA, colour = "black") +
-  theme_classic() +
-  labs(x = "TGC", y = "Count of farms")
-```
-
 ```{r fig-ref-SGR}
 #| fig-cap: Specific growth rate of single individuals grown at 100 random farms across the production period, starting at either DOY 121 (1st May, northern hemisphere) or DOY 274 (1st October, southern hemisphere).
 
