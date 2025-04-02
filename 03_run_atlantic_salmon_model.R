@@ -20,12 +20,12 @@ library(conflicted)
 conflicts_prefer(dplyr::select(), dplyr::filter(), .quiet = T)
 
 # functions
-source("src/model_functions.R")
+source("00_model_functions.R")
 fixnum <- function(n, digits = 4) {str_flatten(c(rep("0", digits-nchar(as.character(n))), as.character(n)))}
 
 # species paths
 this_species <- "atlantic_salmon"
-this_path <- sprintf("data/%s", this_species)
+this_path <- file.path("data", this_species)
 
 # STEP 1: Temperature forcings ------------------------------------------------------------------------------------
 # You don't need to do this again unless you make changes - all the important stuff is saved
@@ -122,16 +122,16 @@ mean_farm_temp <- farm_list %>%
   })
 
 farms_to_omit <- mean_farm_temp %>% 
-  filter(mean_temp < 4) %>% 
+  filter(mean_temp < 2) %>% 
   pull(farm_id)
 
 qsave(x = farms_to_omit, 
       file = sprintf("data/_general_data/farm_locations/%s_farms_to_omit.qs", this_species))
 
-
 # STEP 2 - Run model ----------------------------------------------------------------------------------------------
 ## Example individuals --------------------------------------------------------------------------------------------
 Sys.setenv(TAR_PROJECT = "project_individual")
+tar_visnetwork()
 tar_make(reporter = "summary", seconds_meta_append = 300)
 tar_prune()
 
