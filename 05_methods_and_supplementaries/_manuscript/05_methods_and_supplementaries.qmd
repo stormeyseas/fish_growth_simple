@@ -27,10 +27,6 @@ format:
   #     - "C:/Users/treimer/Documents/R-temp-files/local_to_global_mariculture_modelling/resources/title.tex"
   #   include-in-header:
   #     file: "C:/Users/treimer/Documents/R-temp-files/local_to_global_mariculture_modelling/resources/header_extra.tex"
-
-filters:
-  - acronyms
-  
 execute:
   eval: true
   echo: false
@@ -41,7 +37,7 @@ execute:
 knitr: 
   opts_chunk:
     fig.align: center
-
+    
 editor: source
 ---
 
@@ -79,19 +75,18 @@ b <- c(b1, b2, b3)
 
 # Model approach
 
-We adapted the methods of @baldan_r_2018 to create a bioenergetic model that simulates individual growth and farm-scale production for Atlantic salmon and the resultant nutrient waste in the form of excess labile nitrogen and phosphorus. 
-The model simulates growth at an individual level, calculating the change in individual weight through time using:
+We adapted the methods of @baldan_r_2018 to create a bioenergetic model that simulates individual growth and farm-scale production for Atlantic salmon and the resultant nutrient waste in the form of excess labile nitrogen and phosphorus. The model simulates growth at an individual level, calculating the change in individual weight through time using:
 
 $$
 \frac{dw}{dt} = \frac{A-C}{\epsilon}
 $$
 
-Where $w=$ is wet weight (t), $t=$ time (d), $A=$ anabolic rate (J t$^{-1}$), $C=$ the catabolic rate (J t$^{-1}$), $\epsilon=$ energy density of body tissues (J t$^{-1}$). 
+Where $w=$ is wet weight (t), $t=$ time (d), $A=$ anabolic rate (J t$^{-1}$), $C=$ the catabolic rate (J t$^{-1}$), $\epsilon=$ energy density of body tissues (J t$^{-1}$).
 
-Individual models were then upscaled using monte-carlo simulations to simulate size structure in a population. Size differences were achieved through different initial starting weights and ingestion rates for different finfish species. All individuals have a fixed mortality rate to simulate stocking and harvesting. 
+Individual models were then upscaled using monte-carlo simulations to simulate size structure in a population. Size differences were achieved through different initial starting weights and ingestion rates for different finfish species. All individuals have a fixed mortality rate to simulate stocking and harvesting.
 
-* Parameterised for atlantic salmon
-* Farms with mean temperature < 8.5$^\circ$ were excluded
+-   Parameterised for atlantic salmon
+-   Farms with mean temperature \< 8.5$^\circ$ were excluded
 
 # Water temp
 
