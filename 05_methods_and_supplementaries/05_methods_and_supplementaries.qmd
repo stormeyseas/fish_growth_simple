@@ -403,85 +403,97 @@ params <- tar_read(sens_all_params, store = targets_store)
 pnames <- names(params)
 ```
 
-|:-------:|:----:|-------------------|-------------|---------------------------|
-| Parameter | Value | Units | Description | Reference | Comment |
-| $\alpha$             | `r unname(params['alpha'])` | - | Feeding catabolism coefficient | @broekhuizen_modelling_1994 | *Salvelinus alpinus*, *Oncorhynchus mykiss* (temps: 8–13$^{\circ}$C) |
-| $\epsilon_{P}$       | `r unname(params['epsprot'])` | J g protein-1 | Energy content of protein | @baldan_r_2018 |  |
-| $\epsilon_{L}$       | `r unname(params['epslip'])` | J g lipid-1 | Energy content of lipid | @baldan_r_2018 |  |
-| $\epsilon_{C}$       | `r unname(params['epscarb'])` | J g carbohydrate-1 | Energy content of carbohydrate | @baldan_r_2018 |  |
-| $\epsilon_{O_2}$     | `r unname(params['epsO2'])` | J g O2-1 | Energy consumed by the respiration of 1 g of oxygen | @elliott_energy_1975 |  |
-| $pk$                 | `r unname(params['pk'])` | d-1 | Temperature coefficient for the fasting catabolism | @macnaughton_using_2019 |  |
-| $k_0$                | `r unname(params['k0'])` | degree C-1 | Fasting catabolism at 0 Celsius degree | @macnaughton_using_2019 |  |
-| $m$                  | `r unname(params['m'])` | Weight exponent for the anabolism | Description | @broekhuizen_modelling_1994 | *Salvelinus alpinus*, *Oncorhynchus mykiss* (temps: 8–13$^{\circ}$C) |
-| $n$                  | `r unname(params['n'])` | Weight exponent for the catabolism | Description | @baldan_r_2018 |  |
-| $\beta C$            | `r unname(params['betac'])` | - | Shape coefficient for the feeding function | @jonsson_thermal_2001 | Fish size range: 2.25$\pm$0.49 – 11.5$\pm$5.29 g, temperature ranges: 5–24$^{\circ}$C. Coefficent for mean daily energy intake of the moderately fast growing group, 0.4398 (mean fast group), 0.2214 (mean slow group) |
-| $T_{max}$            | `r unname(params['Tma'])` | C | Maximum lethal temperature | @poletto_unusual_2017 | Juvenile Chinook salmon (19.8$\pm$0.02 g, acclimation temp: 15$^{\circ}$C, 19$^{\circ}$C) |
-| $T_{opt}$            | `r unname(params['Toa'])` | C | Optimal temperature | @jonsson_thermal_2001 | Fish size range: 2.25$\pm$0.49 – 11.5$\pm$5.29 g, temperature ranges: 5–24$^{\circ}$C. 
-Alt value: 14°C [@handeland_effect_2008], *Salmo salar* initial size: 77.0$\pm$14.6 g, temps: 6, 10, 14, 18$^{\circ}$C |
-| $T_{min}$            | `r unname(params['Taa'])` | C | Lowest feeding temperature | @vadboncoeur_lowering_2023 |  Fish essentially stop feeding when below 2$^{\circ}$C |
-| $\omega$             | `r unname(params['omega'])` | g O2 / g | Oxygen consumption:weight loss ratio | @baldan_r_2018 | Calibrated value |
-| $a$                  | `r unname(params['a'])` | J g tissue-1 | Energy content of fish tissue | @tien_development_2016 | Alt value: 17.02350 (nls model fitted to female Atlantic salmon data extracted and transformed from @jonsson_energy_2003 |
-| $k$                  | `r unname(params['k'])` | - | Weight exponent for energy content | @tien_development_2016 | Alt value: 1.65175 (nls model fitted to female Atlantic salmon data extracted and transformed from @jonsson_energy_2003 |
-| $eff$                | `r unname(params['eff'])` | - | Food ingestion efficiency | @uglem_does_2020 | Range: 95-97% ingestion efficiency |
-| $\overline{W}$       | `r unname(params['meanW'])` | g | Dry weight mean | @dempsey_estimating_2023 | Range of 100-150 given so used a mean of 125 and sd of 10 which over 1000 draws from a normal distribution delivers a minimum and maximum close to these numbers |
-| $\Delta{W}$          | `r unname(params['deltaW'])` | g | Dry weight standard deviation | @dempsey_estimating_2023 | Range of 100-150 given so used a mean of 125 and sd of 10 which over 1000 draws from a normal distribution delivers a minimum and maximum close to these numbers |
-| $Wlb$                | `r unname(params['Wlb'])` | g | Dry weight lower bound | Reference |  |
-| $\overline{I_{max}}$ | `r unname(params['meanImax'])` | g g-1 fish day-1 | Ingestion rate mean | [FAO](https://www.fao.org/fileadmin/user_upload/affris/docs/tabl10.pdf) |  |
-| $\Delta{I_{max}}$    | `r unname(params['deltaImax'])` | g g-1 fish day-1 | Ingestion rate standard deviation | [FAO](https://www.fao.org/fileadmin/user_upload/affris/docs/tabl10.pdf) |  |
-| $mort$               | `r unname(params['mortmyt'])` | d-1 | Natural mortality rate | @tvete_towards_2023 |  |
+| Parameter | Value | Units | Description | Reference | Comment | 
+|:-------:|:----:|:----:|-------------------|-------------|---------------------------|
+| $\alpha$ | `r unname(params['alpha'])` | - | Feeding catabolism coefficient | @broekhuizen_modelling_1994 | *Salvelinus alpinus*, *Oncorhynchus mykiss* (temps: 8–13$^{\circ}$C) | 
+| $\epsilon_{P}$ | `r unname(params['epsprot'])` | J g protein-1 | Energy content of protein | @baldan_r_2018 | | 
+| $\epsilon_{L}$ | `r unname(params['epslip'])` | J g lipid-1 | Energy content of lipid | @baldan_r_2018 | | 
+| $\epsilon_{C}$ | `r unname(params['epscarb'])` | J g carbohydrate-1 | Energy content of carbohydrate | @baldan_r_2018 | | 
+| $\epsilon_{O_2}$ | `r unname(params['epsO2'])` | J g O2-1 | Energy consumed by the respiration of 1 g of oxygen | @elliott_energy_1975 | | 
+| $pk$ | `r unname(params['pk'])` | d-1 | Temperature coefficient for the fasting catabolism | @macnaughton_using_2019 | | 
+| $k_0$ | `r unname(params['k0'])` | degree C-1 | Fasting catabolism at 0 Celsius degree | @macnaughton_using_2019 | | 
+| $m$ | `r unname(params['m'])` | - | Weight exponent for the anabolism | @broekhuizen_modelling_1994 | *Salmo trutta* (temps: 8–13$^{\circ}$C) | 
+| $n$ | `r unname(params['n'])` | - | Weight exponent for the catabolism | @baldan_r_2018 | | 
+| $\beta C$ | `r unname(params['betac'])` | - | Shape coefficient for the feeding function | @jonsson_thermal_2001 | Fish size range: 2.25$\pm$0.49 – 11.5$\pm$5.29 g, temperature ranges: 5–24$\^{\circ}$C. Coefficent for mean daily energy intake of the moderately fast growing group, 0.4398 (mean fast group), 0.2214 (mean slow group) | 
+| $T_{max}$ | `r unname(params['Tma'])` | C | Maximum lethal temperature | @poletto_unusual_2017 | Juvenile Chinook salmon (19.8$\pm$0.02 g, acclimation temp: 15$^{^\circ}$C, 19${\circ}$C) | 
+| $T_{opt}$ | `r unname(params['Toa'])` | C | Optimal temperature | @jonsson_thermal_2001 | Fish size range: 2.25$\pm$0.49 – 11.5$\pm$5.29 g, temperature ranges: 5–24$^{^\circ}$C.
+Alt value: 14°C [@handeland_effect_2008], *Salmo salar* initial size: 77.0$\pm$14.6 g, temps: 6, 10, 14, 18${\circ}$C | 
+| $T_{min}$ | `r unname(params['Taa'])` | C | Lowest feeding temperature | @vadboncoeur_lowering_2023 | Fish essentially stop feeding when below 2$^{\circ}$C | | $\omega$ | `r unname(params['omega'])` | g O2 / g | Oxygen consumption:weight loss ratio | @baldan_r_2018 | Calibrated value | 
+| $a$ | `r unname(params['a'])` | J g tissue-1 | Energy content of fish tissue | @van_tien_development_2016 | Alt value: 17.02350 (nls model fitted to female Atlantic salmon data extracted and transformed from @jonsson_energy_2003 | 
+| $k$ | `r unname(params['k'])` | - | Weight exponent for energy content | @van_tien_development_2016 | Alt value: 1.65175 (nls model fitted to female Atlantic salmon data extracted and transformed from @jonsson_energy_2003 | 
+| $eff$ | `r unname(params['eff'])` | - | Food ingestion efficiency | @uglem_does_2020 | Range: 95-97% ingestion efficiency | 
+| $\overline{W}$ | `r unname(params['meanW'])` | g | Dry weight mean | @dempsey_estimating_2023 | Range of 100-150 given so used a mean of 125 and sd of 10 which over 1000 draws from a normal distribution delivers a minimum and maximum close to these numbers | 
+| $\Delta{W}$ | `r unname(params['deltaW'])` | g | Dry weight standard deviation | @dempsey_estimating_2023 | Range of 100-150 given so used a mean of 125 and sd of 10 which over 1000 draws from a normal distribution delivers a minimum and maximum close to these numbers | 
+| $Wlb$ | `r unname(params['Wlb'])` | g | Dry weight lower bound | Reference | | 
+| $\overline{I_{max}}$ | `r unname(params['meanImax'])` | g g-1 fish day-1 | Ingestion rate mean | [FAO](https://www.fao.org/fileadmin/user_upload/affris/docs/tabl10.pdf) | | 
+| $\Delta{I_{max}}$ | `r unname(params['deltaImax'])` | g g-1 fish day-1 | Ingestion rate standard deviation | [FAO](https://www.fao.org/fileadmin/user_upload/affris/docs/tabl10.pdf) | | 
+| $mort$ | `r unname(params['mortmyt'])` | d-1 | Natural mortality rate | @tvete_towards_2023 | |
+: Params
 
 ## Sensitivity
 
+In the following plots, a value > 0 indicates that increasing that parameter increases the output variable while a negative value indicates that increasing the parameter decreases the variable. The sensitivity follows a power relationship, such that output$_1$ $\propto$ output$_0^{S}$.
+
 ```{r param sensitivity data}
-sens_wt <- file.path("data", "atlantic_salmon", "data_products", "weight_parameter_sensitivity.parquet") %>% read_parquet()
-sens_dw <- file.path("data", "atlantic_salmon", "data_products", "dw_parameter_sensitivity.parquet") %>% read_parquet()
-sens_excr <- file.path("data", "atlantic_salmon", "data_products", "excreted_parameter_sensitivity.parquet") %>% read_parquet()
-sens_uneat <- file.path("data", "atlantic_salmon", "data_products", "uneaten_parameter_sensitivity.parquet") %>% read_parquet()
+#| code-summary: Load sensitivity data
+
+sens_wt <- file.path("..", "data", "atlantic_salmon", "data_products", "weight_parameter_sensitivity.parquet") %>% 
+  read_parquet() %>% 
+  mutate(adj_param = factor(adj_param, levels = rev(adj_param)))
+# sens_dw <- file.path("data", "atlantic_salmon", "data_products", "dw_parameter_sensitivity.parquet") %>% 
+#   read_parquet() %>% 
+#   mutate(adj_param = factor(adj_param, levels = rev(adj_param)))
+# sens_excr <- file.path("data", "atlantic_salmon", "data_products", "excreted_parameter_sensitivity.parquet") %>% 
+#   read_parquet() %>% 
+#   mutate(adj_param = factor(adj_param, levels = rev(adj_param)))
+# sens_uneat <- file.path("data", "atlantic_salmon", "data_products", "uneaten_parameter_sensitivity.parquet") %>% 
+#   read_parquet() %>% 
+#   mutate(adj_param = factor(adj_param, levels = rev(adj_param)))
 ```
 
+Looking at @fig-param-sens-weight:
+
+* The most sensitive parameter by far is $m$ the weight exponent for anabolism, followed closely by $n$ the weight exponent for catabolism
+* These two are also relatively uncertain, as $m$ was taken from *Salmo trutta* measurements in a fairly old paper [@broekhuizen_modelling_1994] and $n$ was taken from @baldan_r_2018 which did not specifically look at Atlantic salmon. There must be more up-to-date measurements for Atlantic salmon in particular. 
+
 ```{r fig-param-sens-weight}
-sens_wt %>% 
-  mutate(adj_param = factor(adj_param, levels = rev(adj_param))) %>% 
-  ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
-  geom_col(alpha = 0.35, colour = "black") +
-  geom_errorbar(width = 0.3) +
-  geom_hline(aes(yintercept = 0), linetype = "dashed") +
-  coord_flip() +
-  theme_classic()
+#| fig-cap: Impact of varying each model parameter from 0.9-1.1 on individual fish weight at the end of the production period.
+
+(
+  p_sens <- sens_wt %>% 
+    ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
+    geom_col(alpha = 0.35, colour = "black") +
+    geom_errorbar(width = 0.3) +
+    geom_hline(aes(yintercept = 0), linetype = "dashed") +
+    scale_y_continuous(breaks = seq(-20,30,5)) +
+    labs(x = "Adjusted parameter", y = "Sensitivity") +
+    theme_classic() + theme(legend.position = "none", 
+          strip.text = element_blank(), 
+          aspect.ratio = 0.8,
+          text = element_text(size = 12)) +
+    coord_flip()
+ )
 ```
 
 ```{r fig-param-sens-dw}
-sens_dw %>% 
-  mutate(adj_param = factor(adj_param, levels = rev(adj_param))) %>% 
-  ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
-  geom_col(alpha = 0.35, colour = "black") +
-  geom_errorbar(width = 0.3) +
-  geom_hline(aes(yintercept = 0), linetype = "dashed") +
-  coord_flip() +
-  theme_classic()
+#| fig-cap: Impact of varying each model parameter from 0.9-1.1 on the mean daily weight change of individual fish across the entire production period.
+#| eval: false
+
+p_sens %+% sens_dw
 ```
 
 ```{r fig-param-sens-excr}
-sens_excr %>% 
-  mutate(adj_param = factor(adj_param, levels = rev(adj_param))) %>% 
-  ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
-  geom_col(alpha = 0.35, colour = "black") +
-  geom_errorbar(width = 0.3) +
-  geom_hline(aes(yintercept = 0), linetype = "dashed") +
-  coord_flip() +
-  theme_classic()
+#| fig-cap: Impact of varying each model parameter from 0.9-1.1 on the total excretion (g protein, carbs and lipids) of an individual fish across the entire production period.
+#| eval: false
+
+p_sens %+% sens_excr
 ```
 
 ```{r fig-param-sens-uneat}
-sens_uneat %>% 
-  mutate(adj_param = factor(adj_param, levels = rev(adj_param))) %>% 
-  ggplot(aes(x = adj_param, y = sens, ymin = sens-sd, ymax = sens+sd)) +
-  geom_col(alpha = 0.35, colour = "black") +
-  geom_errorbar(width = 0.3) +
-  geom_hline(aes(yintercept = 0), linetype = "dashed") +
-  coord_flip() +
-  theme_classic()
-```
+#| fig-cap: Impact of varying each model parameter from 0.9-1.1 on the total uneaten feed (g) of an individual fish across the entire production period.
+#| eval: false
 
+p_sens %+% sens_uneat
+```
 
 # References
