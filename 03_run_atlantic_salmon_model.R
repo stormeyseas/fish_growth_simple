@@ -132,27 +132,29 @@ qsave(x = farms_to_omit,
 # STEP 2 - Run model ----------------------------------------------------------------------------------------------
 ## Example individuals --------------------------------------------------------------------------------------------
 Sys.setenv(TAR_PROJECT = "project_individual")
-tar_make(names = sens_individual, reporter = "summary", seconds_meta_append = 300)
+tar_make(reporter = "summary", seconds_meta_append = 300)
 tar_prune()
 
 farm_IDs <- tar_read(farm_IDs)
 sens_all_params <- tar_read(sens_all_params)
-# sens <- tar_read(sens_individual, branches = 1)
+
+# patt2 <- tar_pattern(pattern = cross(farm_IDs, cross(sens_params_names, factors)), farm_IDs = 5, sens_params_names = 4, factors = 3)
 patt <- data.frame(
+  farm_ID = rep(farm_IDs, each = length(sens_all_params)*3),
   param = rep(rep(1:length(sens_all_params), each = 3), times = length(farm_IDs)),
   factor = rep(c(0.9,1,1.1), times = length(sens_all_params)*length(farm_IDs))
-  )
+)
 patt$br <- 1:nrow(patt)
 
 wt_ls <- dw_ls <- excr_ls <- uneat_ls <- list()
 for (p in 1:length(sens_all_params)) {
-  br <- patt$br[patt$param == p]
-  sens <- tar_read(sens_individual, branches = br)
-  sens$farm_ID <- rep(farm_IDs, times = 3)
+  br <- patt[patt$param == p, ]
+  sens <- tar_read(sens_individual, branches = br$br)
+  sens$farm_ID <- br$farm_ID
   
   wt_ls[[p]] <- sens %>% 
     select(weight, farm_ID, adj_param, factor) %>% 
-    pivot_wider(names_from = factor, names_prefix = "p", values_from = weight) %>% 
+    pivot_wider(names_from = factor, names_prefix = "p", values_from = weight, id_cols = c(adj_param, farm_ID)) %>% 
     mutate(sens = (p1.1 - p0.9)/(0.2*p1)) %>% 
     group_by(adj_param) %>% 
     reframe(sd = sd(sens),
