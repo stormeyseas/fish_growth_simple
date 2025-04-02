@@ -11,7 +11,7 @@ suppressMessages(suppressWarnings(library(conflicted)))
 conflicts_prefer(dplyr::filter(), dplyr::select(), .quiet = T)
 
 tar_option_set(
-  packages = c("stringr", "magrittr", "tidyr", "arrow", "dplyr", "future", "furrr", "ggplot2", "matrixStats", "tibble"), 
+  packages = c("stringr", "magrittr", "tidyr", "arrow", "dplyr", "future", "furrr", "ggplot2", "matrixStats", "tibble", "units"), 
   format = "qs", 
   controller = crew_controller_local(workers = 12, seconds_idle = 10),
   workspace_on_error = TRUE
@@ -19,12 +19,12 @@ tar_option_set(
 
 tar_source("src/model_functions.R")
 
-# Paths ----------------------------------------------------------------------------------------------
+# Paths -----------------------------------------------------------------------------------------------------------
 this_species <- "atlantic_salmon"
 this_path <- file.path("data", this_species)
 google_path <- "C:/Users/treimer/OneDrive - University of Tasmania/Sustainable Aquafeeds/Data from Google Drive"
 
-# Begin targets pipeline -----------------------------------------------------------------------------
+# Begin targets pipeline ------------------------------------------------------------------------------------------
 list(
   tar_target(farm_data_file, "data/_general_data/SST/farm_SST_extracted.parquet", format = "file"),
   tar_target(farm_coord_file, "data/_general_data/farm_locations/farm_coords.parquet", format = "file"),
@@ -36,7 +36,7 @@ list(
       read_parquet() %>% 
       filter(!farm_id %in% farms_to_omit) %>% 
       distinct(farm_id) %>% 
-      slice_sample(n = 1250) %>%
+      slice_sample(n = 272) %>%
       as.vector() %>% unlist() %>% unname()
   ),
   tar_target(
@@ -44,7 +44,11 @@ list(
     read_parquet(farm_data_file) %>% 
       select(-c(day, temp_c)) %>% 
       filter(farm_id == farm_IDs) %>% 
-      slice_head(n = 1),
+      slice_head(n = 1) %>% 
+      mutate(
+        harvest_size = drop_units(set_units(set_units(harvest_size_t, "t"), "g"))
+      ) %>% 
+      select(-c(harvest_size_t)),
     pattern = farm_IDs
   ),
   tar_target(
@@ -57,8 +61,8 @@ list(
   ),
   
   # starts 1 May in northern hemisphere, 1 October in southern hemisphere
-  tar_target(times_N, c("t_start" = 121, "t_end" = 121+730, "dt" = 1)),
-  tar_target(times_S, c("t_start" = 274, "t_end" = 274+730, "dt" = 1)),
+  tar_target(times_N, c("t_start" = 121, "t_end" = 121+547, "dt" = 1)),
+  tar_target(times_S, c("t_start" = 274, "t_end" = 274+547, "dt" = 1)),
   tar_target(
     farm_coords, 
     read_parquet(farm_coord_file) %>% 
@@ -70,12 +74,17 @@ list(
              pattern = farm_IDs),
   tar_target(farm_temp, farm_ts_data$temp_c[farm_times['t_start']:farm_times['t_end']], pattern = map(farm_ts_data, farm_times)),
   
-  tar_target(species_param_file, file.path(google_path,"Species Parameters.xlsx"), format = "file"),
+  tar_target(species_param_file, file.path(this_path, "params", "Species Parameters.xlsx"), format = "file"),
   tar_target(species_params, get_spec_params(species_param_file, "Atlantic salmon")),
   
   # Population parameters
-  # tar_target(pop_params_file, file.path(google_path,"Population parameters.xlsx"), format = "file"),
-  tar_target(pop_params, c('meanW' = 175, 'deltaW' = 100, 'Wlb' = 0.0001, 'meanImax' = 0.035, 'deltaImax' = 0.0035, 'mortmyt' = 0.00041, 'nruns' = 5000)),
+  tar_target(pop_params_file, file.path(this_path, "params", "Population.csv"), format = "file"),
+  tar_target(pop_params, command = {
+    df <- read.csv(pop_params_file)
+    vc <- df$Value
+    names(vc) <- df$Quantity
+    vc[!is.na(vc)]
+  }),
 
   # Feed parameters
   tar_target(feed_types, c("reference", "past", "future")),
@@ -117,9 +126,9 @@ list(
         species_params = species_params,
         water_temp = farm_temp,
         feed_params = list(
-          Proteins = feed_params_protein[[1]],
-          Carbohydrates = feed_params_carbs[[1]],
-          Lipids = feed_params_lipids[[1]]
+          Proteins = feed_params_protein,
+          Carbohydrates = feed_params_carbs,
+          Lipids = feed_params_lipids
         ),
         times = farm_times,
         init_weight = pop_params["meanW"],
@@ -129,12 +138,12 @@ list(
         as.data.frame() %>% remove_rownames() %>% 
         mutate(SGR = 100 * (exp((log(weight)-log(weight[1]))/(days-days[1])) - 1),
                FCR = food_prov/dw) %>% 
-        mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types[1])) %>% 
+        mutate(days = as.integer(days), farm_ID = as.integer(farm_IDs), feed = as.factor(feed_types)) %>% 
         group_by(farm_ID, feed) %>% 
         mutate(prod_days = days - min(days)+1) %>% 
         ungroup()
     },
-    pattern = map(farm_IDs, farm_temp, farm_times)
+    pattern = cross(map(farm_IDs, farm_temp, farm_times), map(feed_types, feed_params_protein, feed_params_carbs, feed_params_lipids))
   ),
 
 ## Senstivities ---------------------------------------------------------------------------------------------------
@@ -151,7 +160,11 @@ list(
 
   tar_target(
     name = sens_adjusted_params,
-    command = adj_params(sens_all_params, sens_params_names, factors),
+    command = {
+      vc <- sens_all_params
+      vc[sens_params_names] <- vc[sens_params_names] * factors
+      vc
+    },
     pattern = cross(sens_params_names, factors),
     iteration = "list"
   ),
@@ -173,7 +186,6 @@ list(
       ) %>% as.data.frame() %>% remove_rownames() %>% 
         mutate(adj_param = sens_params_names,
                factor = factors)
-      
       data.frame(
         weight = last(sens$weight[!is.na(sens$weight)]),
         dw = mean(sens$dw, na.rm = T),
@@ -194,8 +206,7 @@ list(
         factor = unique(sens$factor)
       )
     },
-    pattern = cross(map(farm_IDs, farm_temp, farm_times), map(sens_adjusted_params, cross(sens_params_names, factors))),
-    memory = "persistent"
+    pattern = cross(map(farm_IDs, farm_temp, farm_times), map(sens_adjusted_params, cross(sens_params_names, factors)))
   )
 )
 
