@@ -11,7 +11,7 @@ suppressMessages(suppressWarnings(library(conflicted)))
 conflicts_prefer(dplyr::filter(), dplyr::select(), .quiet = T)
 
 tar_option_set(
-  packages = c("stringr", "magrittr", "tidyr", "arrow", "dplyr", "future", "furrr", "ggplot2", "matrixStats", "tibble"), 
+  packages = c("stringr", "magrittr", "tidyr", "arrow", "dplyr", "future", "furrr", "ggplot2", "matrixStats", "tibble", "units"), 
   format = "qs", 
   controller = crew_controller_local(workers = 5),
   workspace_on_error = TRUE
@@ -36,8 +36,20 @@ list(
       read_parquet() %>% 
       filter(!farm_id %in% farms_to_omit) %>% 
       distinct(farm_id) %>% 
-      slice_sample(n = 272) %>% # Just taking a small sample for testing
+      slice_sample(n = 25) %>% # Just taking a small sample for testing
       as.vector() %>% unlist() %>% unname()
+  ),
+  tar_target(
+    farm_static_data, 
+    read_parquet(farm_data_file) %>% 
+      select(-c(day, temp_c)) %>% 
+      filter(farm_id == farm_IDs) %>% 
+      slice_head(n = 1) %>% 
+      mutate(
+        harvest_size = drop_units(set_units(set_units(harvest_size_t, "t"), "g"))
+      ) %>% 
+      select(-c(harvest_size_t)),
+    pattern = farm_IDs
   ),
   
   # Farm temperature data -----------------------------------------------------------------------------------------
@@ -133,7 +145,6 @@ list(
   tar_target(
     main_farm_growth,
     farm_growth(
-      pop_params = pop_params,
       species_params = species_params,
       water_temp = farm_temp,
       feed_params = list(
@@ -147,6 +158,27 @@ list(
     ),
     pattern = cross(map(feed_types, feed_params_protein, feed_params_carbs, feed_params_lipids), map(farm_IDs, farm_temp, farm_times, N_population))
   ),
+  # weight_stat
+  # biomass_stat
+  # dw_stat
+  # SGR_stat
+  # E_somat_stat
+  # P_excr_stat
+  # L_excr_stat
+  # C_excr_stat
+  # P_uneat_stat
+  # L_uneat_stat
+  # C_uneat_stat
+  # ing_act_stat
+  # anab_stat
+  # catab_stat
+  # O2_stat
+  # NH4_stat
+  # food_prov_stat
+  # rel_feeding_stat
+  # T_response_stat
+  # total_excr_mat
+  # total_uneat_mat
 
   tar_target(CommSize, 4500),
   tar_target(
@@ -154,9 +186,9 @@ list(
     data.frame(
       farm_ID = farm_IDs,
       feed = feed_types,
-      Ub = days_to_CS(weight_stat = (main_farm_growth[[1]][,1] + main_farm_growth[[1]][,2]), days = 1:547, CS = CommSize),
-      Mean = days_to_CS(weight_stat = main_farm_growth[[1]][,1], days = 1:547, CS = CommSize),
-      Lb = days_to_CS(weight_stat = (main_farm_growth[[1]][,1] - main_farm_growth[[1]][,2]), days = 1:547, CS = CommSize)
+      Ub = days_to_CS(weight_stat = (main_farm_growth[[1]][,1] + main_farm_growth[[1]][,2]), days = 1:548, CS = CommSize),
+      Mean = days_to_CS(weight_stat = main_farm_growth[[1]][,1], days = 1:548, CS = CommSize),
+      Lb = days_to_CS(weight_stat = (main_farm_growth[[1]][,1] - main_farm_growth[[1]][,2]), days = 1:548, CS = CommSize)
     ),
     pattern = map(main_farm_growth, cross(feed_types, farm_IDs))
   ),

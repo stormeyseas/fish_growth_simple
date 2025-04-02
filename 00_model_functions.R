@@ -120,19 +120,18 @@ fish_growth <- function(species_params, water_temp, feed_params, times, init_wei
   return(output)
 }
 
-farm_growth <- function(pop_params, species_params, feed_params, water_temp, times, N_pop, nruns){
+farm_growth <- function(species_params, feed_params, water_temp, times, N_pop, nruns){
 
   days <- (times['t_start']:times['t_end'])*times['dt']
   
   # Initiate matrices to fill for each population iteration
   weight_mat <- biomass_mat <- dw_mat <- SGR_mat <- E_somat_mat <- P_excr_mat <-  L_excr_mat <- C_excr_mat <- P_uneat_mat <- L_uneat_mat <- C_uneat_mat <- ing_act_mat <- anab_mat <- catab_mat <- O2_mat <- NH4_mat <- food_prov_mat <- rel_feeding_mat <- T_response_mat <- total_excr_mat <- total_uneat_mat <- matrix(data = 0, nrow = nruns, ncol = length(days)) 
   
-  init_weight <- rnorm(nruns, mean = pop_params['meanW'], sd = pop_params['deltaW'])
-  ingmax <- rnorm(nruns, mean = pop_params['meanImax'], sd = pop_params['deltaImax'])
+  init_weight <- rnorm(nruns, mean = species_params['meanW'], sd = species_params['deltaW'])
+  ingmax <- rnorm(nruns, mean = species_params['meanImax'], sd = species_params['deltaImax'])
   
   for(n in 1:nruns){
     ind_output <- fish_growth(
-      pop_params = pop_params,
       species_params = species_params,
       water_temp = water_temp,
       feed_params = feed_params,
@@ -193,7 +192,7 @@ farm_growth <- function(pop_params, species_params, feed_params, water_temp, tim
 }
 
 days_to_CS <- function(weight_stat, days, CS){
-  days[weight_stat[which(weight_stat > CS)]][1]
+  days[which(weight_stat >= CS)][1]
 }
 
 get_farms <- function(farms_file, farm_ID, this_species){

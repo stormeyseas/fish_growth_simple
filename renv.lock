@@ -4526,6 +4526,23 @@
       "Maintainer": "Hadley Wickham <hadley@rstudio.com>",
       "Repository": "CRAN"
     },
+    "rbenchmark": {
+      "Package": "rbenchmark",
+      "Version": "1.0.0",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Benchmarking routine for R",
+      "Date": "2012-08-30",
+      "Authors@R": "c( person(\"Wacek\", \"Kusnierczyk\", role=c(\"aut\", \"cre\"), email=\"waku@idi.ntnu.no\"), person(\"Dirk\", \"Eddelbuettel\", role=\"ctb\", email=\"edd@debian.org\"), person(\"Berend\", \"Hasselman\", role=\"ctb\", email=\"bhh@xs4all.nl\"))",
+      "Author": "Wacek Kusnierczyk <waku@idi.ntnu.no>",
+      "Maintainer": "Wacek Kusnierczyk <waku@idi.ntnu.no>",
+      "Description": "rbenchmark is inspired by the Perl module Benchmark, and is intended to facilitate benchmarking of arbitrary R code. The library consists of just one function, benchmark, which is a simple wrapper around system.time.  Given a specification of the benchmarking process (counts of replications, evaluation environment) and an arbitrary number of expressions, benchmark evaluates each of the expressions in the specified environment, replicating the evaluation as many times as specified, and returning the results conveniently wrapped into a data frame.",
+      "License": "GPL (>= 2)",
+      "LazyLoad": "yes",
+      "URL": "http://rbenchmark.googlecode.com",
+      "Repository": "CRAN",
+      "Encoding": "UTF-8"
+    },
     "rbibutils": {
       "Package": "rbibutils",
       "Version": "2.3",
