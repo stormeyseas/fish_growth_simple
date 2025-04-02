@@ -2,11 +2,11 @@
 ### https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0195732
 ### https://github.com/cran/RAC/tree/master/R
 
-suppressWarnings(library(qs2))
-suppressWarnings(library(terra))
-# suppressWarnings(library(here))
-suppressWarnings(library(qs))
+suppressMessages(suppressWarnings(library(qs)))
+suppressMessages(suppressWarnings(library(qs2)))
+suppressMessages(suppressWarnings(library(terra)))
 suppressWarnings(library(readxl))
+suppressMessages(suppressWarnings(library(units)))
 
 # CREATE REPO STURCTURE
 
@@ -880,7 +880,3 @@ fixnum <- function(n, digits = 4) {
   str_flatten(c(rep("0", digits-nchar(as.character(n))), as.character(n)))
 }
 
-adj_params <- function(params, name, fact){
-  params[name] <- params[name] * fact
-  return(params)
-}
