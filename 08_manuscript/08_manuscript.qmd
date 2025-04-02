@@ -124,32 +124,32 @@ affiliations:
 # key-points:
 #   - Point 1
 #   - Point 2
-bibliography: ["C:/Users/treimer/Documents/R-temp-files/local_to_global_mariculture_modelling/resources/refs.bib", "C:/Users/treimer/Documents/R-temp-files/local_to_global_mariculture_modelling/resources/manual-refs.bib"]
+bibliography: ["../resources/refs.bib", "../resources/manual-refs.bib"]
 
 format: 
-  # html:
-  #   theme: simplex
-  #   css: ["C:/Users/treimer/Documents/R-temp-files/local_to_global_mariculture_modelling/resources/extra.css"]
-  #   code-fold: true
-  #   code-overflow: wrap
-  #   toc: true
-  #   toc-expand: true
-  #   toc-location: left
-  #   lang: en-GB
-  #   grid:
-  #     sidebar-width: 350px
-  #     body-width: 1200px
-  #     margin-width: 250px
-  #     gutter-width: 2em
+  html:
+    theme: simplex
+    css: ["../resources/extra.css"]
+    code-fold: true
+    code-overflow: wrap
+    toc: true
+    toc-expand: true
+    toc-location: left
+    lang: en-GB
+    grid:
+      sidebar-width: 350px
+      body-width: 1200px
+      margin-width: 250px
+      gutter-width: 2em
   pdf:
     papersize: a4
     linestretch: 1.15
     link-citations: true
     keep-tex: true
     template-partials:
-      - "C:/Users/treimer/Documents/R-temp-files/local_to_global_mariculture_modelling/resources/title.tex"
+      - "../resources/title.tex"
     include-in-header:
-      file: "C:/Users/treimer/Documents/R-temp-files/local_to_global_mariculture_modelling/resources/header_extra.tex"
+      file: "../resources/header_extra.tex"
 
 filters:
   - acronyms
