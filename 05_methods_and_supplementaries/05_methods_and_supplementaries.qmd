@@ -232,7 +232,7 @@ $$
 FR_{rel} = e^{b(T_w-T_{opt})} \times \bigg[\frac{T_{max}-T_w}{T_{max}-T_{opt}}\bigg]^{b(T_{max}-T_{opt})}
 $$
 
-where $T_{opt}$ is the optimum feeding temperature, $T_{max}$ is the maximum feeding temperature, $T_w$ is the current water temperature, and $b$ is a species-specific shape coefficient. 
+where $T_{opt}$ is the optimum feeding temperature, $T_{max}$ is the maximum feeding temperature (lethal temperature), $T_w$ is the current water temperature, and $b$ is a species-specific shape coefficient.
 
 ```{r fig-feeding-rate-with-temperature}
 #| fig-cap: Changes in salmons feeding rate with temperature. The dashed line shows the optimum feeding temperature for salmon while the dotted lines show the minimum and maximum feeding temperatures.
