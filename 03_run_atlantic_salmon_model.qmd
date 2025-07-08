@@ -1,0 +1,637 @@
+---
+title: "Formulating experimental feeds"
+author: Tormey Reimer
+date: today
+format: html
+editor: source
+---
+
+# Introduction
+
+```{r setup}
+library(arrow)
+library(conflicted)
+library(dplyr)
+library(fs)
+library(furrr)
+library(future)
+library(ggplot2)
+library(here)
+library(magrittr)
+library(purrr)
+library(qs)
+library(readxl)
+library(sf)
+library(stringr)
+library(targets)
+library(terra)
+library(tictoc)
+library(tidyr)
+library(units)
+
+conflicts_prefer(dplyr::select(), dplyr::filter(), .quiet = T)
+
+here("00_model_functions.R") %>% source()
+here("00_dirs.R") %>% source()
+```
+
+# Make sure incoming data is complete
+
+You don't really need to do this again unless you make changes - all the important stuff is already saved.
+
+```{r precheck}
+#| code-summary: Get temperature data and formulated feeds
+#| eval: false
+
+here("01_extracting_temperatures.R") |> source()
+here("02_formulating_feeds.R") |> source()
+```
+
+## Choose "reference" feed
+
+The "reference" feed is somewhat arbitrary. It's the only feed run in sensitivity analysis, and it's the point of comparison in the main analysis.
+
+```{r reference-feed}
+feed_params <- file.path(output_species_data_path, "feed_params.qs") %>% qs::qread()
+reference_feed <- feed_params[["plant_dominant"]]
+```
+
+# Set up for ananlyses
+
+This section makes sure all the data necessary for the individual runs (sensitivity) and farm growth pipelines is in the correct format.
+
+```{r load-farm-times}
+#| code-summary: Get farm locations
+
+farm_coords_file <- file.path(farms_locs_path, "farm_coords.parquet")
+farm_starts_file <- file.path(output_farm_data_path, "farm_starts.qs")
+farm_geometry_file <- file.path(output_farm_data_path, "farm_geometry.qs")
+
+farm_starts <- if (!file.exists(farm_coords_fortargets_file)) {
+    times_N <- c("t_start" = 121, "t_end" = 121+547, "dt" = 1)
+    times_S <- c("t_start" = 274, "t_end" = 274+547, "dt" = 1)
+
+    fc <- farm_coords_file %>% 
+    read_parquet() %>% 
+    mutate(t_start = case_when(lat > 0 ~ times_N['t_start'], TRUE ~ times_S['t_start']), 
+            t_end = case_when(lat > 0 ~ times_N['t_end'], TRUE ~ times_S['t_end']),
+            t_start = unname(t_start),
+            t_end = unname(t_end))
+    qsave(fc, farm_starts_file)
+    fc
+} else {
+  qs::qread(farm_starts_file)
+}
+
+# Also save geometry for later
+if (!file.exists(farm_geometry_file)) {
+  file.path(farms_locs_path, "atlantic_salmon_locations_w_temps.qs") %>% 
+    qread() %>% 
+    dplyr::filter(day == "day_1") %>% 
+    dplyr::select(farm_id, geometry, country) %>% 
+    qsave(farm_geometry_file)
+}
+```
+
+```{r load-farm-temperature-data}
+#| code-summary: Get temperature timeseries data
+
+farm_ts_file <- file.path(output_farm_data_path, "farm_ts_data.qs")
+
+farm_ts_data <- if (!file.exists(farm_ts_file)) {
+    farms_to_omit <- file.path(farms_locs_path, "atlantic_salmon_farms_to_omit.qs") %>% qread()
+    farm_SST_data <- file.path(farm_sst_path, "farm_SST_extracted.parquet") %>% read_parquet()
+    
+    df <- farm_SST_data %>%
+        rename(farm_ID = farm_id) %>% 
+        filter(!farm_ID %in% farms_to_omit) %>% 
+        select(c(farm_ID, day, temp_c)) %>%
+        mutate(day = str_split_i(day, "day_", 2) %>% as.integer())
+    qsave(df, farm_ts_file)
+    df
+} else {
+  qs::qread(farm_ts_file)
+}
+```
+
+```{r load-species-parameters}
+#| code-summary: Get species-specific parameters
+
+species_params_excel <- c(
+    file = file.path(input_species_param_path, "Species.xlsx"), 
+    sheet = "data"
+    )
+species_params_file <- file.path(output_species_data_path, "species_params.qs")
+
+species_params <- if (!file.exists(species_params_file)) {
+    df <- readxl::read_excel(path = species_params_excel["file"], sheet = species_params_excel["sheet"])
+    vc <- df$Value
+    names(vc) <- df$Quantity
+    vc <- vc[!is.na(vc)]
+    qsave(vc, species_params_file)
+    vc
+} else {
+  qs::qread(species_params_file)
+}
+```
+
+```{r load-population-parameters}
+#| code-summary: Get population parameters
+
+pop_params_excel <- c(file = file.path(input_species_param_path, "Population.xlsx"))
+pop_params_file <- file.path(output_species_data_path, "pop_params.qs")
+
+pop_params <- if (!file.exists(pop_params_file)) {
+    df <- readxl::read_excel(path = pop_params_excel["file"])
+    vc <- df$Value
+    names(vc) <- df$Quantity
+    vc <- vc[!is.na(vc)]
+    qsave(vc, pop_params_file)
+    vc
+} else {
+  qs::qread(pop_params_file)
+}
+```
+
+## Calculate harvest size
+
+Individual harvest sizes are calculated for each farm. 
+
+```{r calculate-farm-harvest-size}
+#| code-summary: Calculate individual harvest size for each farm 
+
+farm_harvest_size_file <- file.path(output_farm_data_path, "farm_harvest_size.qs")
+
+farm_harvest_size <- if (file.exists(farm_harvest_size_file)) {
+    qs::qread(farm_harvest_size_file)
+} else {
+    hs <- purrr::map(farm_IDs, function(farm_id) {
+        farm_times <- c(
+            t_start = farm_starts$t_start[farm_starts$farm_ID == farm_id],
+            t_end = farm_starts$t_end[farm_starts$farm_ID == farm_id],
+            dt = 1
+        )
+        farm_temp <- farm_ts_data %>%
+            filter(farm_ID == farm_id) %>%
+            filter(day >= farm_times['t_start'], day <= farm_times['t_end']) %>%
+            pull(temp_c)
+        df <- fish_growth(
+            pop_params = pop_params,
+            species_params = species_params,
+            water_temp = farm_temp,
+            feed_params = reference_feed,
+            times = farm_times,
+            init_weight = species_params["meanW"],
+            ingmax = species_params["meanImax"]
+        )
+        df %>%
+            as.data.frame() %>%
+            slice_tail(n = 1) %>%
+            select(weight) %>%
+            mutate(farm_ID = farm_id,
+                    weight = units::set_units(weight, "g"))
+        }) %>% 
+            bind_rows()
+
+    qsave(hs, farm_harvest_size_file)
+    hs
+}
+```
+
+# Choose a farms subset
+
+Normally the analysis would be run for all farms, but this takes a long time. For now I'm going to choose a sample of farms to run going forward.
+
+```{r farm-subset}
+farm_IDs <- farm_ts_data %>% 
+  pull(farm_ID) %>% 
+  unique() %>% 
+  sample(10)
+
+farm_starts <- farm_starts %>% filter(farm_ID %in% farm_IDs)
+
+farm_ts_data <- farm_ts_data %>% 
+  filter(farm_ID %in% farm_IDs) %>% 
+  merge(farm_starts, by = "farm_ID") %>% 
+  filter(between(day, t_start, t_end))
+farm_ts_data <- split(farm_ts_data, farm_ts_data$farm_ID)
+
+farm_harvest_size <- farm_harvest_size %>% 
+  filter(farm_ID %in% farm_IDs) %>% 
+  pull(weight)
+```
+
+# Run sensitivity analysis
+
+The sensitivity analysis investigates the overall impact of changing each parameter by $\pm10\%$.
+
+```{r set-up-sensitivity-runs}
+param_names_pop <- names(pop_params)
+param_names_pop <- param_names_pop[!param_names_pop %in% c("nruns")]
+
+param_names_spec <- names(species_params)
+param_names_spec <- param_names_spec[!param_names_spec %in% c('betaprot', 'betalip', 'betacarb', 'fcr', 'CS')]
+
+all_params <- c(pop_params, species_params)
+
+factors <- c(0.9, 1, 1.1)
+```
+
+These next blocks run the sensitivity analyses. 
+
+```{r run-sensitivity-spec-params}
+sens_spec <- purrr::map(factors, function(fac) {
+  purrr::map(param_names_spec, function(nm) {
+    purrr::map2(farm_IDs, farm_ts_data, function(farm, ts) {
+      adj_params <- all_params
+      adj_params[nm] <- adj_params[nm] * fac
+
+      sens <- uni_farm_growth(
+        pop_params = adj_params,
+        species_params = adj_params,
+        water_temp = ts$temp_c,
+        feed_params = reference_feed,
+        times = c('t_start' = unique(ts$t_start), 't_end' = unique(ts$t_end), 'dt' = 1),
+        N_pop = rep(1, nrow(ts))
+      )
+
+      data.frame(
+        weight = last(sens[['weight_stat']][, 2][!is.na(sens[['weight_stat']][, 2])]),
+        dw = mean(sens[['dw_stat']][, 2], na.rm = T),
+        total_excr = sum(sens[['total_excr_stat']][, 2], na.rm = T),
+        P_excr = sum(sens[['P_excr_stat']][, 2], na.rm = T),
+        L_excr = sum(sens[['L_excr_stat']][, 2], na.rm = T),
+        C_excr = sum(sens[['C_excr_stat']][, 2], na.rm = T),
+        total_uneat = sum(sens[['total_uneat_stat']][, 2], na.rm = T),
+        P_uneat = sum(sens[['P_uneat_stat']][, 2], na.rm = T),
+        L_uneat = sum(sens[['L_uneat_stat']][, 2], na.rm = T),
+        C_uneat = sum(sens[['C_uneat_stat']][, 2], na.rm = T),
+        food_prov = sum(sens[['food_prov_stat']][, 2], na.rm = T),
+        rel_feeding = mean(sens[['rel_feeding_stat']][, 2], na.rm = T),
+        ing_act = sum(sens[['ing_act_stat']][, 2], na.rm = T),
+        anab = mean(sens[['anab_stat']][, 2], na.rm = T),
+        catab = mean(sens[['catab_stat']][, 2], na.rm = T),
+        O2 = sum(sens[['O2_stat']][, 2], na.rm = T),
+        NH4 = sum(sens[['NH4_stat']][, 2], na.rm = T),
+        adj_param = as.factor(nm)
+      ) %>%
+        mutate(farm_ID = farm)
+    }) %>%
+      bind_rows() %>% 
+      mutate(factor = fac)
+  }) %>% 
+    bind_rows()  
+}) %>% 
+  bind_rows()  
+```
+
+Note that the sensitivity of population parameters are run for every factor, nruns x (5000). This might take a long time (~20 minutes).
+
+```{r run-sensitivity-pop-params}
+plan("multisession", workers = 15)
+
+sens_pop <- future_map(factors, function(fac) {
+  future_map(param_names_pop, function(nm) {
+
+    adj_params <- all_params
+    adj_params[nm] <- adj_params[nm] * fac
+
+    future_map(farm_IDs, farm_ts_data, function(farm, ts) {
+
+      sens <- farm_growth(
+        pop_params = adj_params,
+        species_params = adj_params,
+        water_temp = ts$temp_c,
+        feed_params = reference_feed,
+        times = c('t_start' = unique(ts$t_start), 't_end' = unique(ts$t_end), 'dt' = 1),
+        N_pop = rep(1, nrow(ts)),
+        nruns = adj_params["nruns"] # the only difference
+      )
+
+      data.frame(
+        weight = last(sens[['weight_stat']][, 2][!is.na(sens[['weight_stat']][, 2])]),
+        dw = mean(sens[['dw_stat']][, 2], na.rm = T),
+        total_excr = sum(sens[['total_excr_stat']][, 2], na.rm = T),
+        P_excr = sum(sens[['P_excr_stat']][, 2], na.rm = T),
+        L_excr = sum(sens[['L_excr_stat']][, 2], na.rm = T),
+        C_excr = sum(sens[['C_excr_stat']][, 2], na.rm = T),
+        total_uneat = sum(sens[['total_uneat_stat']][, 2], na.rm = T),
+        P_uneat = sum(sens[['P_uneat_stat']][, 2], na.rm = T),
+        L_uneat = sum(sens[['L_uneat_stat']][, 2], na.rm = T),
+        C_uneat = sum(sens[['C_uneat_stat']][, 2], na.rm = T),
+        food_prov = sum(sens[['food_prov_stat']][, 2], na.rm = T),
+        rel_feeding = mean(sens[['rel_feeding_stat']][, 2], na.rm = T),
+        ing_act = sum(sens[['ing_act_stat']][, 2], na.rm = T),
+        anab = mean(sens[['anab_stat']][, 2], na.rm = T),
+        catab = mean(sens[['catab_stat']][, 2], na.rm = T),
+        O2 = sum(sens[['O2_stat']][, 2], na.rm = T),
+        NH4 = sum(sens[['NH4_stat']][, 2], na.rm = T),
+        adj_param = as.factor(nm)
+      ) %>%
+        mutate(farm_ID = farm)
+
+    }, .options = furrr_options(seed = T)) %>%
+      bind_rows() %>% 
+      mutate(factor = fac)
+
+  }, .options = furrr_options(seed = T)) %>% 
+    bind_rows()  
+  
+}, .options = furrr_options(seed = T)) %>% 
+  bind_rows()  
+
+plan("sequential")
+```
+
+```{r process-sensitivities}
+stat_names <- colnames(sens_spec)[!colnames(sens_spec) %in% c("farm_ID", "factor", "adj_param")]
+
+sens_spec <- sens_spec %>% 
+  group_by(farm_ID, factor, adj_param) %>% 
+  slice_tail(n = 1) %>% 
+  pivot_longer(
+    cols = all_of(stat_names), 
+    names_to = "measure", 
+    values_to = "value", 
+    names_transform = list(measure = as.factor)
+    ) %>% 
+  pivot_wider(
+    names_from = "factor", 
+    values_from = "value", 
+    names_prefix = "fact_"
+    ) %>% 
+  mutate(sensitivity = (fact_1.1-fact_0.9)/(0.2*fact_1)) %>% 
+  group_by(adj_param, measure) %>%
+  reframe(
+    mean_sens = meanna(sensitivity),
+    sd_sens = sdna(sensitivity)
+    )
+
+sens_pop <- sens_pop %>% 
+  group_by(farm_ID, factor, adj_param) %>% 
+  slice_tail(n = 1) %>% 
+  pivot_longer(
+    cols = all_of(stat_names), 
+    names_to = "measure", 
+    values_to = "value", 
+    names_transform = list(measure = as.factor)
+    ) %>% 
+  pivot_wider(
+    names_from = "factor", 
+    values_from = "value", 
+    names_prefix = "fact_"
+    ) %>% 
+  mutate(sensitivity = (fact_1.1-fact_0.9)/(0.2*fact_1)) %>% 
+  group_by(adj_param, measure) %>%
+  reframe(
+    mean_sens = meanna(sensitivity),
+    sd_sens = sdna(sensitivity)
+    )
+
+sens_results <- rbind(sens_spec, sens_pop)
+
+sens_results_files <- file.path(output_sens_data_path, paste0("sens_results_", stat_names, ".qs"))
+sens_results_figfiles <- file.path(output_sens_data_path, paste0("sens_plot_", stat_names, ".qs"))
+
+for (sn in seq_along(stat_names)) {
+    sr <- sens_results %>% 
+        filter(measure == stat_names[sn]) 
+    qsave(sr, sens_results_files[sn])
+
+    p <- sr %>% 
+        ggplot(aes(x = adj_param, y = mean_sens, ymin = mean_sens-sd_sens, ymax = mean_sens+sd_sens)) +
+        geom_col(fill = "salmon", alpha = 0.65, colour = "black") +
+        geom_errorbar(width = 0.5) +
+        coord_flip() +
+        theme_classic()
+    qsave(p, sens_results_figfiles[sm])
+}
+```
+
+# Run farm growth 
+
+Much of the data needed for this has already been loaded earlier in this markdown.
+
+```{r generate-population}
+farm_static_data <- file.path(farms_locs_path, "atlantic_salmon_locations_w_temps.qs") %>% 
+      qs::qread() %>% 
+      sf::st_drop_geometry() %>% 
+      distinct(farm_id, tonnes_per_farm) %>% 
+      mutate(
+        tonnes_per_farm = tonnes_per_farm %>% 
+          units::set_units("t") %>% 
+          units::set_units("g") %>% 
+          units::drop_units()
+        ) %>% 
+      rename(farm_ID = farm_id) %>% 
+      merge(farm_harvest_size, by = "farm_ID")
+
+farm_static_data <- split(farm_static_data, farm_static_data$farm_id)
+
+N_pop <- purrr::map2(farm_static_data, farm_starts, function(sd, fs) {
+  generate_pop(
+    harvest_n = sd$tonnes_per_farm/sd$harvest_size,
+    mort = pop_params['mortmyt'],
+    times = c(unique(fs['t_start']), unique(fs['t_end']), 'dt' = 1)
+    )
+}
+```
+
+Like the sensitivity pipeline, this takes a long time to run (4-5 minutes per iteration).
+
+```{r run-farm-growth-pipeline}
+tar_make(names = c("tar_harvest_size", "tar_common_params", "tar_N_pop", "tar_farm_ts"), seconds_meta_append = 90)
+```
+
+```{r tar-farmruns-comparisons}
+patt <- tar_pattern(
+    cross(fi, fn),
+    fi = length(farm_IDs),
+    fn = length(feed_names)
+) %>% 
+    mutate(
+        fi = factor(fi, labels = farm_IDs) %>% as.character() %>% as.integer(),
+        fn = factor(fn, labels = feed_names)
+    )
+patt$branch <- 1:nrow(patt)
+
+stat_names <- c(
+    "weight_stat", 
+    "dw_stat", 
+    "water_temp_stat", 
+    "T_response_stat", 
+    "P_excr_stat", 
+    "L_excr_stat", 
+    "C_excr_stat", 
+    "P_uneat_stat", 
+    "L_uneat_stat", 
+    "C_uneat_stat", 
+    "food_prov_stat", 
+    "food_enc_stat", 
+    "rel_feeding_stat", 
+    "ing_pot_stat", 
+    "ing_act_stat", 
+    "E_assim_stat", 
+    "E_somat_stat", 
+    "anab_stat","catab_stat", 
+    "O2_stat", 
+    "NH4_stat", 
+    "total_excr_stat", 
+    "total_uneat_stat", 
+    "metab_stat",
+    "biomass_stat"
+    )
+
+# Convert farms to cohorts (reference feed)
+tar_farmrun_comparisons <- purrr::map(feed_names, function(fn) {
+    tar_load(tar_farmrun, branches = patt$branch[patt$fi == 215 & patt$fn == fn])
+    ref1 <- lapply(tar_farmrun, farm_to_cohort, time_offset = 0)
+    ref2 <- lapply(tar_farmrun, farm_to_cohort, time_offset = 365)
+    ref3 <- lapply(tar_farmrun, farm_to_cohort, time_offset = 730)
+    lims <- unique(ref2[[1]]$t)
+
+    ref <- purrr::map(1:length(stat_names), function(st) {
+        df <- bind_rows(
+            ref1[[st]] %>% mutate(cohort = 1), 
+            ref2[[st]] %>% mutate(cohort = 2), 
+            ref3[[st]] %>% mutate(cohort = 3)
+            ) %>% 
+          mutate(sd = sd/mean, 
+                 feed = factor(fn, levels = feed_names)) %>%
+          group_by(feed, t) %>%
+          reframe(mean = sum(mean),
+                  sd = sum(sd)*mean,
+                  stat = stat_names[st]) %>% 
+          filter(t %in% lims)
+      })
+}) %>% 
+    bind_rows() %>% 
+    mutate(
+        farm_ID = as.integer(73),
+        t = as.integer(t)
+        )
+
+
+
+
+tar_target(
+    tar_farmrun_comparisons,
+    command = {
+      # Convert farms to cohorts (reference feed)
+      ref1 <- lapply(tar_farmrun_reference, farm_to_cohort, time_offset = 0)
+      ref2 <- lapply(tar_farmrun_reference, farm_to_cohort, time_offset = 365)
+      ref3 <- lapply(tar_farmrun_reference, farm_to_cohort, time_offset = 730)
+      
+      # Get the t values of cohort 2
+      lims <- unique(ref2[[1]]$t)
+      
+      ref <- purrr::map(1:length(stat_names), function(st) {
+        bind_rows(ref1[[st]], ref2[[st]], ref3[[st]]) %>% 
+          mutate(sd = sd/mean, 
+                 feed = factor("reference", levels = c("reference", "past", "future"))) %>%
+          group_by(feed, t) %>%
+          reframe(mean = sum(mean),
+                  sd = sum(sd)*mean) %>% 
+          filter(t %in% lims)
+      })
+      
+      # Convert farms to cohorts (future feed)
+      ref1 <- lapply(tar_farmrun_future, farm_to_cohort, time_offset = 0)
+      ref2 <- lapply(tar_farmrun_future, farm_to_cohort, time_offset = 365)
+      ref3 <- lapply(tar_farmrun_future, farm_to_cohort, time_offset = 730)
+      
+      # Get the t values of cohort 2
+      lims <- unique(ref2[[1]]$t)
+      
+      fut <- purrr::map(1:length(stat_names), function(st) {
+        bind_rows(ref1[[st]], ref2[[st]], ref3[[st]]) %>% 
+          mutate(sd = sd/mean, 
+                 feed = factor("future", levels = c("reference", "past", "future"))) %>%
+          group_by(feed, t) %>%
+          reframe(mean = sum(mean),
+                  sd = sum(sd)*mean) %>% 
+          filter(t %in% lims)
+      })
+      
+      # Convert farms to cohorts (past feed)
+      ref1 <- lapply(tar_farmrun_past, farm_to_cohort, time_offset = 0)
+      ref2 <- lapply(tar_farmrun_past, farm_to_cohort, time_offset = 365)
+      ref3 <- lapply(tar_farmrun_past, farm_to_cohort, time_offset = 730)
+      
+      # Get the t values of cohort 2
+      lims <- unique(ref2[[1]]$t)
+      
+      pas <- purrr::map(1:length(stat_names), function(st) {
+        bind_rows(ref1[[st]], ref2[[st]], ref3[[st]]) %>% 
+          mutate(sd = sd/mean, 
+                 feed = factor("past", levels = c("reference", "past", "future"))) %>%
+          group_by(feed, t) %>%
+          reframe(mean = sum(mean),
+                  sd = sum(sd)*mean) %>% 
+          filter(t %in% lims)
+      })
+      
+      # Put them all together
+      purrr::map(1:length(stat_names), function(st) {
+        bind_rows(ref[[st]], pas[[st]], fut[[st]]) %>% 
+          mutate(farm_ID = as.integer(tar_farm_IDs),
+                 t = as.integer(t))
+      })
+    },
+    pattern = map(tar_farm_IDs, tar_farmrun_reference, tar_farmrun_past, tar_farmrun_future)
+  )
+```
+
+```{r save-targets-outputs-2}
+tar_load(stat_names)
+
+farmrun_reference_files <- file.path(output_growth_data_path, sprintf("farmrun_reference_%s.qs", fixnum(farm_IDs,4)))
+farmrun_past_files <- file.path(output_growth_data_path, sprintf("farmrun_past_%s.qs", fixnum(farm_IDs,4)))
+farmrun_future_files <- file.path(output_growth_data_path, sprintf("farmrun_future_%s.qs", fixnum(farm_IDs,4)))
+farmrun_comparisons_files <- file.path(output_cohorts_data_path, sprintf("farmrun_comparisons_%s.qs", fixnum(farm_IDs,4)))
+
+
+for (f in seq_along(farm_IDs)) {
+  targets::tar_load(tar_farmrun_reference, branches = f) 
+  tar_farmrun_reference %>%
+    setNames(stat_names) %>%
+    lapply(function(x) {colnames(x) <- c("t", "mean", "sd"); x}) %>%
+    lapply(function(x) {cbind(x, farm_ID = farm_IDs[f])})  %>%
+    qs::qsave(farmrun_reference_files[f])
+  
+  targets::tar_load(tar_farmrun_past, branches = f) 
+  tar_farmrun_past %>%
+    setNames(stat_names) %>%
+    lapply(function(x) {colnames(x) <- c("t", "mean", "sd"); x}) %>%
+    lapply(function(x) {cbind(x, farm_ID = farm_IDs[f])})  %>%
+    qs::qsave(farmrun_past_files[f])
+  
+  targets::tar_load(tar_farmrun_future, branches = f) 
+  tar_farmrun_future %>%
+    setNames(stat_names) %>%
+    lapply(function(x) {colnames(x) <- c("t", "mean", "sd"); x}) %>%
+    lapply(function(x) {cbind(x, farm_ID = farm_IDs[f])})  %>%
+    qs::qsave(farmrun_future_files[f])
+  
+  # Save the final cohort feed comparison data
+  targets::tar_load(tar_farmrun_comparisons, branches = f) 
+  tar_farmrun_comparisons %>% 
+    setNames(stat_names) %>% 
+    qs::qsave(farmrun_comparisons_files[f])
+}
+
+# Use the intermediate growth data to save aggregate files
+aggregate_comparison_files <- file.path(output_cohorts_data_path, str_c("allfarms_comparisons_", stat_names, ".qs"))
+
+for (s in seq_along(stat_names)) {
+  purrr::map(farmrun_comparisons_files, function(fnm) {
+    qread(fnm)[[stat_names[s]]]
+  }) %>% 
+    bind_rows() %>% 
+    qsave(aggregate_comparison_files[s])
+}
+```
+
+
+
+

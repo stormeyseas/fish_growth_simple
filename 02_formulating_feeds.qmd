@@ -1,0 +1,126 @@
+---
+title: "Formulating experimental feeds"
+author: Tormey Reimer
+date: today
+format: html
+editor: source
+---
+
+# Introduction
+
+The purpose of this markdown is to:
+
+```{r setup}
+#| code-summary: R setup
+
+library(arrow)
+library(sf)
+library(dplyr)
+library(tidyr)
+library(terra)
+library(magrittr)
+library(furrr)
+library(future)
+library(tictoc)
+library(ggplot2)
+library(fs)
+library(conflicted)
+library(stringr)
+library(readxl)
+library(units)
+library(qs)
+library(here)
+conflicts_prefer(dplyr::filter(), dplyr::select(), .quiet = T)
+
+here("00_model_functions.R") %>% source()
+here("00_dirs.R") %>% source()
+
+ingred_input_file <- file.path(feed_profile_path, "all_ingredients.csv")
+feed_input_file <- file.path(feed_profile_path, "all_feeds.csv")
+```
+
+# Import ingredients
+
+Note that there is no check to ensure that protein + lipid + carb == 1. It is assumed that any discrepancy is due to ash content.
+
+``` {r import-ingredients}
+#| code-summary: Ingredient details
+
+ingreds <- ingred_input_file %>% 
+  read.csv() %>% 
+  mutate(ingredient = as.factor(ingredient))
+ingred_nms <- levels(ingreds$ingredient)
+```
+
+# Import feeds
+
+There is no check or correction here to ensure that ingredient proportions = 1 in the incoming data. This was checked manually prior to import. 
+
+``` {r import-feeds}
+#| code-summary: Feed compositions
+
+feed_inputs <- feed_input_file %>% 
+  read.csv() %>% 
+  pivot_longer(names_to = "feed", values_to = "proportion", cols = !contains(c("ingredient", "proportion"))) %>% 
+  mutate(feed = as.factor(feed),
+         ingredient = as.factor(ingredient)) 
+
+# Check that ingredient proportions == 1
+feed_inputs |> 
+  group_by(feed) |> 
+  reframe(total = sumna(proportion))
+```
+
+If total ingredient proportions != 1 then the feed is fixed by scaling all ingredients.
+
+```{r fix-feeds}
+#| code-summary: Fix feed compositions if total != 1
+
+feed_inputs <- feed_inputs |> 
+  group_by(feed) |> 
+  mutate(total = sumna(proportion)) |> 
+  ungroup() |> 
+  mutate(proportion = proportion/total) |> 
+  select(-total)
+
+# Check again
+feed_inputs |> 
+  group_by(feed) |> 
+  reframe(total = sumna(proportion))
+```
+
+# Formulate feeds
+
+The following chunk allows as many ingredients and feeds to be added to the incoming data as needed, it will still be formatted into a form that the `targets` pipelines can use. You just need to make sure that the ingredient names in the feeds and ingredients dataframes match exactly.
+
+```{r formulate feeds}
+#| code-summary: Format feeds as lists to feed into targets
+
+feed_inputs <- feed_inputs %>% 
+  merge(ingreds, by = "ingredient", all = T) |> 
+  select(-sum)
+
+feed_types <- levels(feed_inputs$feed)
+
+feed_params <- purrr::map(feed_types, function(ft) {
+  df <- feed_inputs %>% 
+    filter(feed == ft & proportion != 0) 
+  list(
+    Proteins = df %>% 
+      select(ingredient, proportion, contains("protein"), -contains("feed")) %>%
+      rename(macro = protein, digest = protein_digestibility),
+    Carbohydrates = df %>% 
+      select(ingredient, proportion, contains("carb"), -contains("feed")) %>%
+      rename(macro = carb, digest = carb_digestibility),
+    Lipids = df %>% 
+      select(ingredient, proportion, contains("lipid"), -contains("feed")) %>%
+      rename(macro = lipid, digest = lipid_digestibility)
+  )
+}) %>% 
+  setNames(feed_types)
+```
+
+```{r save}
+qsave(feed_params, file.path(output_species_data_path, "feed_params.qs"))
+```
+

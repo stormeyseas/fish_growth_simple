@@ -1,9 +1,0 @@
-
-project_individual:
-  script: 01_targets_individual.R
-  store: 01_targets_individual
-  
-project_farm:
-  script: 02_targets_farm.R
-  store: 02_targets_farm
-
