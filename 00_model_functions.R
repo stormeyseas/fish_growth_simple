@@ -61,24 +61,24 @@ find_read <- function(path, pattern){
 # species_params['eff']           [-] Food ingestion efficiency
 # species_params['fcr']           [-] Food conversion ratio
 
-get_farms <- function(farms_file, farm_ID, this_species){
-  qread(farms_file) %>% 
-    filter(model_name == this_species) %>% 
-    select(-row_num) %>% 
-    mutate(farm_id = row_number()) %>% 
-    filter(farm_id == farm_ID)
-}
+# Not in use anymore
+#get_farms <- function(farms_file, farm_ID, this_species){
+#  qread(farms_file) %>% 
+#    filter(model_name == this_species) %>% 
+#    select(-row_num) %>% 
+#    mutate(farm_id = row_number()) %>% 
+#    filter(farm_id == farm_ID)
+#}
 
-get_feed_params <- function(file){
-  df <- read.csv(file, header = F)
-  values <- as.numeric(df$V1)
-  names(values) <- df$V2
-  values <- values[!is.na(values)]
-  return(values)
-}
+#get_feed_params <- function(file){
+#  df <- read.csv(file, header = F)
+#  values <- as.numeric(df$V1)
+#  names(values) <- df$V2
+#  values <- values[!is.na(values)]
+#  return(values)
+#}
 
 generate_pop <- function(harvest_n, mort, times) {
-  
   ts <- seq(times['t_start'], times['t_end'], by = times['dt'])   # Integration times
   
   # Initial condition and vectors initialization
@@ -313,20 +313,6 @@ uni_farm_growth <- function(pop_params, species_params, feed_params, water_temp,
   }) %>% setNames(paste0(names(all_results2), "_stat"))
   
   return(out_list)
-}
-
-farm_to_cohort <- function(matrix, time_offset = 0) {
-  matrix %>% 
-    as.data.frame() %>% 
-    rename(t = V1, mean = V2, sd = V3) %>%
-    mutate(t = t + time_offset)
-}
-
-# Process each time period (current, +365 days, +730 days)
-combine_cohorts <- function(lst) {
-  bind_rows(farm_to_cohort(lst[[i]], 0),
-            farm_to_cohort(lst[[i]], 365),
-            farm_to_cohort(lst[[i]], 730))
 }
 
 # nolint end
