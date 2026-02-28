@@ -350,4 +350,124 @@ farm_growth_decomposed <- function(pop_params, species_params, feed_params, wate
   return(all_results)
 }
 
+# Function to formulate feeds from ingredients and feed composition dataframes
+# Arguments:
+#   ingredients: dataframe with columns: ingredient, protein, lipid, carb,
+#                protein_digestibility, lipid_digestibility, carb_digestibility
+#   feeds: dataframe with columns: ingredient, feed, proportion
+# Returns: named list of feeds, each containing Proteins, Carbohydrates, Lipids dataframes
+formulate_feeds <- function(ingredients, feeds) {
+  
+  # Check required columns exist in ingredients
+  required_ingred_cols <- c("ingredient", "protein", "lipid", "carb",
+                            "protein_digestibility", "lipid_digestibility", "carb_digestibility")
+  missing_ingred_cols <- setdiff(required_ingred_cols, names(ingredients))
+  if (length(missing_ingred_cols) > 0) {
+    stop("Missing required columns in ingredients dataframe: ",
+         paste(missing_ingred_cols, collapse = ", "))
+  }
+  
+  # Check required columns exist in feeds
+  required_feed_cols <- c("ingredient", "feed", "proportion")
+  missing_feed_cols <- setdiff(required_feed_cols, names(feeds))
+  if (length(missing_feed_cols) > 0) {
+    stop("Missing required columns in feeds dataframe: ",
+         paste(missing_feed_cols, collapse = ", "))
+  }
+  
+  # Check that all ingredients in feeds exist in ingredients
+  missing_ingredients <- setdiff(unique(feeds$ingredient), unique(ingredients$ingredient))
+  if (length(missing_ingredients) > 0) {
+    stop("The following ingredients in feeds are not found in ingredients dataframe: ",
+         paste(missing_ingredients, collapse = ", "))
+  }
+  
+  # Replace NAs with 0s in macro columns
+  ingredients <- ingredients %>%
+    mutate(
+      protein = ifelse(is.na(protein), 0, protein),
+      lipid = ifelse(is.na(lipid), 0, lipid),
+      carb = ifelse(is.na(carb), 0, carb)
+    )
+  
+  # Check that protein + lipid + carb < 1 for each ingredient
+  macro_sums <- ingredients %>%
+    mutate(macro_sum = protein + lipid + carb) %>%
+    filter(macro_sum > 1)
+  
+  if (nrow(macro_sums) > 0) {
+    stop("The following ingredients have protein + lipid + carb >= 1: ",
+         paste(macro_sums$ingredient, collapse = ", "))
+  }
+  
+  # Check digestibility columns are between 0 and 1
+  digest_cols <- c("protein_digestibility", "lipid_digestibility", "carb_digestibility")
+  for (col in digest_cols) {
+    invalid_digest <- ingredients %>%
+      filter(!is.na(.data[[col]]) & (.data[[col]] < 0 | .data[[col]] > 1))
+    if (nrow(invalid_digest) > 0) {
+      stop(col, " must be between 0 and 1. Invalid values found in: ",
+           paste(invalid_digest$ingredient, collapse = ", "))
+    }
+  }
+  
+  # Replace NAs with 0s in digestibility columns
+  ingredients <- ingredients %>%
+    mutate(
+      protein_digestibility = ifelse(is.na(protein_digestibility), 0, protein_digestibility),
+      lipid_digestibility = ifelse(is.na(lipid_digestibility), 0, lipid_digestibility),
+      carb_digestibility = ifelse(is.na(carb_digestibility), 0, carb_digestibility)
+    )
+  
+  # Replace NAs with 0s in proportion column
+  feeds <- feeds %>%
+    mutate(proportion = ifelse(is.na(proportion), 0, proportion))
+  
+  # Rescale proportions to sum to 1 within each feed
+  feeds <- feeds %>%
+    group_by(feed) %>%
+    mutate(total = sumna(proportion)) %>%
+    ungroup() %>%
+    mutate(proportion = ifelse(total > 0, proportion / total, 0)) %>%
+    select(-total)
+  
+  # Ensure ingredient and feed are factors
+  ingredients <- ingredients %>%
+    mutate(ingredient = as.factor(ingredient))
+  
+  feeds <- feeds %>%
+    mutate(
+      ingredient = as.factor(ingredient),
+      feed = as.factor(feed)
+    )
+  
+  # Merge ingredients with feeds
+  feed_inputs <- feeds %>%
+    merge(ingredients, by = "ingredient", all.x = TRUE)
+  
+  # Get unique feed types
+  feed_types <- levels(feed_inputs$feed)
+  
+  # Create output list in the same format as the original "formulate-feeds" chunk
+
+  feed_params <- purrr::map(feed_types, function(ft) {
+    df <- feed_inputs %>%
+      filter(feed == ft & proportion != 0)
+    list(
+      Proteins = df %>%
+        select(ingredient, proportion, contains("protein"), -contains("feed")) %>%
+        rename(macro = protein, digest = protein_digestibility),
+      Carbohydrates = df %>%
+        select(ingredient, proportion, contains("carb"), -contains("feed")) %>%
+        rename(macro = carb, digest = carb_digestibility),
+      Lipids = df %>%
+        select(ingredient, proportion, contains("lipid"), -contains("feed")) %>%
+        rename(macro = lipid, digest = lipid_digestibility)
+    )
+  }) %>%
+    setNames(feed_types)
+  
+  return(feed_params)
+}
+
 # nolint end
