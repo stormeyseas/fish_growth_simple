@@ -1,0 +1,113 @@
+---
+title: "Formulating experimental feeds"
+author: Tormey Reimer
+date: today
+format: html
+editor: source
+---
+
+```{r setup}
+#| code-summary: R setup
+#| include: false
+
+library(tidyverse)
+library(conflicted)
+library(here)
+library(purrr)
+library(qs2)
+library(readxl)
+conflicts_prefer(dplyr::filter(), dplyr::select(), .quiet = T)
+
+here("00_model_functions.R") %>% source()
+here("00_dirs.R") %>% source()
+
+output_path <- here("SSP_GS_ouputs")
+dir.create(file.path(output_path, "decomposed_runs"))
+```
+
+# Get ingredients and feeds
+
+``` {r import-data}
+#| code-summary: Get data on feeds and ingredients
+
+ingredients <- file.path(data_path, "all_ingredients.csv") %>% 
+  read.csv()
+
+feeds <- file.path(data_path, "all_feeds.csv") %>% 
+  read.csv() %>% 
+  pivot_longer(names_to = "feed", values_to = "proportion", cols = !contains(c("ingredient", "proportion"))) %>% 
+  filter(str_detect(feed, "sowdamini") & !is.na(proportion))
+```
+
+```{r formulate-feeds}
+#| code-summary: Format feeds as lists to feed into targets
+
+all_feeds <- formulate_feeds(ingredients, feeds)
+qd_save(all_feeds, file.path(output_path, "feed_params.qs"))
+```
+
+# Get tank conditions
+
+```{r tank-conditions}
+n_tanks <- 12
+fish_per_tank <- as.integer(305/n_tanks)
+days <- 1:(13*7)
+temperature <- rep(13, length(days))
+
+species_params <- read_excel(file.path("data", "Species.xlsx"))$Value
+names(species_params) <- read_excel(file.path("data", "Species.xlsx"))$Quantity
+# Match to tank conditions
+species_params['meanW'] <- 188.7 
+species_params['deltaW'] <- 35.4
+
+pop_params <- read_excel(file.path("data", "Population.xlsx"))$Value
+names(pop_params) <- read_excel(file.path("data", "Population.xlsx"))$Quantity
+# Match to tank conditions
+pop_params['nruns'] <- fish_per_tank
+
+all_params <- c(species_params, pop_params)
+```
+
+# Run model
+
+```{r farm-run-decomposed}
+#| code-summary: Run model per tank and feed
+
+# For testing
+# tank <- 1
+# feed_params <- all_feeds[[1]]
+# feed_name <- names(all_feeds)[1]
+
+overwrite <- F
+
+walk(1:n_tanks, function(tank) {
+  tank_name <- fixnum(tank, digits = 2)  
+  walk2(
+    all_feeds, 
+    names(all_feeds), 
+    function(feed_params, feed_name) {
+      # Check if file exists
+      filename <- file.path(output_path, "decomposed_runs", str_c(feed_name, "_T", tank_name, ".qs"))
+      if (!file.exists(filename) | overwrite) {
+        fg <- farm_growth_decomposed(
+          pop_params = all_params,
+          species_params = all_params,
+          feed_params = feed_params,
+          water_temp = temperature,
+          times = c(t_start = 1, t_end = length(temperature), dt = 1),
+          N_pop = rep(1, length(temperature)),
+          nruns = all_params['nruns']
+        ) %>% 
+          mutate(
+            tank = tank,
+            feed = feed_name
+          )
+        qd_save(fg, filename)
+      }
+  })
+})
+```
+
+# Analysis
+
+
