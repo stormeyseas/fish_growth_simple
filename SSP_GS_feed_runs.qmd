@@ -16,6 +16,7 @@ library(here)
 library(purrr)
 library(qs2)
 library(readxl)
+library(units)
 conflicts_prefer(dplyr::filter(), dplyr::select(), .quiet = T)
 
 here("00_model_functions.R") %>% source()
@@ -110,4 +111,8 @@ walk(1:n_tanks, function(tank) {
 
 # Analysis
 
+```{r}
 
+file.path(output_path, "decomposed_runs") %>% 
+  list.files(full.names = T)
+```
